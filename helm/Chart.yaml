@@ -1,0 +1,10 @@
+apiVersion: v2
+name: cdc-ecommerce
+description: Microservice that implements the change data capture on ecommerce events
+type: application
+version: 0.0.1-SNAPSHOT
+appVersion: 0.0.1-SNAPSHOT
+dependencies:
+  - name: microservice-chart
+    version: 7.5.0
+    repository: "https://pagopa.github.io/aks-microservice-chart-blueprint"
