@@ -97,8 +97,11 @@ tasks.jacocoTestReport {
  * Task used to expand application properties with build specific properties such as artifact name
  * and version
  */
+val projectName = project.name
+val projectVersion = project.version
+
 tasks.processResources {
   filesMatching("application.properties") {
-    expand(mapOf("project.artifactId" to project.name, "project.version" to project.version))
+    expand(mapOf("project.artifactId" to projectName, "project.version" to projectVersion))
   }
 }
