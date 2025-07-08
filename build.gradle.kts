@@ -22,7 +22,12 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 
 configurations { compileOnly { extendsFrom(configurations.annotationProcessor.get()) } }
 
-repositories { mavenCentral() }
+repositories {
+  mavenCentral()
+  mavenLocal()
+}
+
+dependencyLocking { lockAllConfigurations() }
 
 object Dependencies {
   const val ecsLoggingVersion = "1.6.0"
