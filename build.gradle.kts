@@ -1,4 +1,4 @@
-group = "it.pagopa.ecommerce"
+group = "it.pagopa.ecommerce.cdc"
 
 description = "pagopa-ecommerce-cdc-service"
 
@@ -89,7 +89,7 @@ tasks.jacocoTestReport {
     files(
       classDirectories.files.map {
         fileTree(it).matching {
-          exclude("it/pagopa/ecommerce/PagopaEcommerceCdcServiceApplicationKt.class")
+          exclude("it/pagopa/ecommerce/cdc/PagopaEcommerceCdcServiceApplicationKt.class")
         }
       }
     )
