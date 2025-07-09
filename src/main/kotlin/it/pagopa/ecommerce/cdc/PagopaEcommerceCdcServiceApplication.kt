@@ -1,4 +1,4 @@
-package it.pagopa.ecommerce
+package it.pagopa.ecommerce.cdc
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
