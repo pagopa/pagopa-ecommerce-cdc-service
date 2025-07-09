@@ -123,4 +123,4 @@ microservice-chart:
             namespaces: ["ecommerce"]
             topologyKey: topology.kubernetes.io/zone
   azure:
-    workloadIdentityClientId: 8cad3639-cc88-4bff-85fe-5b1ddb2d449e // TODO change
+    workloadIdentityClientId: 42bc90bd-bc0b-419e-8728-5ce1ddb31133
