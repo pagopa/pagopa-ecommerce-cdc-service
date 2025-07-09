@@ -1,0 +1,168 @@
+microservice-chart:
+  namespace: "ecommerce"
+  nameOverride: ""
+  fullnameOverride: "pagopa-ecommerce-cdc-service"
+  canaryDelivery:
+    create: false
+    ingress:
+      bluegreen: false
+      #set canary deployment with traffic balancing see https://github.com/kubernetes/ingress-nginx/blob/main/docs/user-guide/nginx-configuration/annotations.md#canary for more info
+      header: true
+      headerName: deployment
+      headerValue: blue
+      weightPercent: 10
+    image:
+      repository: pagopadcommonacr.azurecr.io/pagopaecommercecdcservice
+      tag: "latest"
+    envConfig:
+      OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service-blue"
+      OTEL_RESOURCE_ATTRIBUTES: "service.name=pagopa-ecommerce-cdc-service-blue,deployment.environment=dev"
+    envSecret: {}
+  image:
+    repository: pagopadcommonacr.azurecr.io/pagopaecommercecdcservice
+    tag: "0.0.1-SNAPSHOT"
+    pullPolicy: Always
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: 8080
+    initialDelaySeconds: 90
+    failureThreshold: 6
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: 8080
+    initialDelaySeconds: 90
+    failureThreshold: 6
+    periodSeconds: 10
+  deployment:
+    create: true
+  service:
+    create: true
+    type: ClusterIP
+    ports:
+      - 8080
+  ingress:
+    create: true
+    host: "weudev.ecommerce.internal.dev.platform.pagopa.it"
+    path: /pagopa-ecommerce-cdc-service/(.*)
+    servicePort: 8080
+  serviceAccount:
+    create: false
+    annotations: {}
+    name: "ecommerce-workload-identity"
+  podAnnotations: {}
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "300m"
+    limits:
+      memory: "512Mi"
+      cpu: "300m"
+  autoscaling:
+    enable: false
+    minReplica: 1
+    maxReplica: 10
+    pollingInterval: 10 # seconds
+    cooldownPeriod: 50 # seconds
+    triggers:
+      - type: cpu
+        metadata:
+          type: Utilization # Allowed types are 'Utilization' or 'AverageValue'
+          value: "75"
+  terminationGracePeriodSeconds: 30
+  strategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  envConfig:
+    OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service"
+    OTEL_SERVICE_ENVIRONMENT: "dev"
+    OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=dev"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.otel.svc:4317"
+    OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+    OTEL_TRACES_EXPORTER: otlp
+    OTEL_METRICS_EXPORTER: otlp
+    OTEL_LOGS_EXPORTER: otlp
+    OTEL_TRACES_SAMPLER: "always_on"
+    CDC_QUEUE_NAME: pagopa-d-weu-ecommerce-cdc-queue
+    CDC_QUEUE_TTL_SECONDS: "7200"
+    CDC_QUEUE_VISIBILITY_TIMEOUT_SECONDS: "0"
+    MONGO_HOST: pagopa-d-weu-ecommerce-cosmos-account.mongo.cosmos.azure.com
+    MONGO_USERNAME: pagopa-d-weu-ecommerce-cosmos-account
+    MONGO_PORT: "10255"
+    MONGO_SSL_ENABLED: "true"
+    MONGO_DB_NAME: "ecommerce"
+    MONGO_MIN_POOL_SIZE: "0"
+    MONGO_MAX_POOL_SIZE: "50"
+    MONGO_MAX_IDLE_TIMEOUT_MS: "600000"
+    MONGO_CONNECTION_TIMEOUT_MS: "2000"
+    MONGO_SOCKET_TIMEOUT_MS: "10000"
+    MONGO_SERVER_SELECTION_TIMEOUT_MS: "2000"
+    MONGO_WAITING_QUEUE_MS: "2000"
+    MONGO_HEARTBEAT_FREQUENCY_MS: "5000"
+    CDC_LOG_EVENTS_COLLECTION_NAME: "ecommerce-log-events"
+    CDC_LOG_EVENTS_OPERATION_TYPE: "insert,update,replace"
+    CDC_LOG_EVENTS_PROJECT: "fullDocument"
+    CDC_SEND_RETRY_MAX_ATTEMPTS: "1"
+    CDC_SEND_RETRY_INTERVAL_IN_MS: "1000"
+    CDC_STREAM_RETRY_MAX_ATTEMPTS: "15"
+    CDC_STREAM_RETRY_INTERVAL_IN_MS: "60000"
+    REDIS_HOST: pagopa-d-weu-ecommerce-redis.redis.cache.windows.net
+    REDIS_PORT: "6380"
+    REDIS_SSL_ENABLED: "true"
+    REDIS_SUB_CONN_MIN: "1"
+    REDIS_SUB_CONN_MAX: "12"
+    REDIS_SLAVE_CONN_MIN: "1"
+    REDIS_SLAVE_CONN_MAX: "12"
+    REDIS_MASTER_CONN_MIN: "1"
+    REDIS_MASTER_CONN_MAX: "12"
+    CDC_REDIS_RESUME_KEYSPACE: "cdcResume"
+    CDC_REDIS_RESUME_TARGET: "ecommerceLogEvents"
+    CDC_REDIS_RESUME_FALLBACK_IN_MIN: "10"
+    CDC_REDIS_RESUME_TTL_IN_MIN: "1440"
+    CDC_RESUME_SAVE_INTERVAL: "5"
+    CDC_REDIS_JOB_LOCK_KEYSPACE: "cdcEventLock"
+    CDC_REDIS_JOB_LOCK_TTL_MS: "600000"
+    CDC_REDIS_JOB_LOCK_WAIT_TIME_MS: "100"
+  envSecret:
+    OTEL_EXPORTER_OTLP_HEADERS: elastic-otel-token-header
+    MONGO_PASSWORD: mongo-ecommerce-password
+    REDIS_PASSWORD: redis-ecommerce-password
+    CDC_QUEUE_CONNECTION_STRING: ecommerce-storage-connection-string
+  keyvault:
+    name: "pagopa-d-ecommerce-kv"
+    tenantId: "7788edaf-0346-4068-9d79-c868aed15b3d"
+  nodeSelector: {}
+  tolerations:
+    - effect: "NoSchedule"
+      key: "paymentWalletOnly"
+      operator: "Equal"
+      value: "true"
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: domain
+                operator: In
+                values:
+                  - ecommerce
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: pagopaecommercecdcservice
+            namespaces: ["ecommerce"]
+            topologyKey: topology.kubernetes.io/zone
+  azure:
+    workloadIdentityClientId: 8cad3639-cc88-4bff-85fe-5b1ddb2d449e // TODO change
