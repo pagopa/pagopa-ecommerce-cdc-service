@@ -1,4 +1,4 @@
-package it.pagopa.ecommerce
+package it.pagopa.ecommerce.cdc
 
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
