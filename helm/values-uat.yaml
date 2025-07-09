@@ -92,9 +92,6 @@ microservice-chart:
     OTEL_METRICS_EXPORTER: otlp
     OTEL_LOGS_EXPORTER: otlp
     OTEL_TRACES_SAMPLER: "always_on"
-    CDC_QUEUE_NAME: pagopa-u-weu-ecommerce-cdc-queue
-    CDC_QUEUE_TTL_SECONDS: "7200"
-    CDC_QUEUE_VISIBILITY_TIMEOUT_SECONDS: "0"
     MONGO_HOST: pagopa-u-weu-ecommerce-cosmos-account.mongo.cosmos.azure.com
     MONGO_USERNAME: pagopa-u-weu-ecommerce-cosmos-account
     MONGO_PORT: "10255"
@@ -115,35 +112,16 @@ microservice-chart:
     CDC_SEND_RETRY_INTERVAL_IN_MS: "1000"
     CDC_STREAM_RETRY_MAX_ATTEMPTS: "15"
     CDC_STREAM_RETRY_INTERVAL_IN_MS: "60000"
-    REDIS_HOST: pagopa-u-weu-ecommerce-redis.redis.cache.windows.net
-    REDIS_PORT: "6380"
-    REDIS_SSL_ENABLED: "true"
-    REDIS_SUB_CONN_MIN: "4"
-    REDIS_SUB_CONN_MAX: "24"
-    REDIS_SLAVE_CONN_MIN: "4"
-    REDIS_SLAVE_CONN_MAX: "24"
-    REDIS_MASTER_CONN_MIN: "4"
-    REDIS_MASTER_CONN_MAX: "24"
-    CDC_REDIS_RESUME_KEYSPACE: "cdcResume"
-    CDC_REDIS_RESUME_TARGET: "ecommerceLogEvents"
-    CDC_REDIS_RESUME_FALLBACK_IN_MIN: "60"
-    CDC_REDIS_RESUME_TTL_IN_MIN: "1440"
-    CDC_RESUME_SAVE_INTERVAL: "5"
-    CDC_REDIS_JOB_LOCK_KEYSPACE: "cdcEventLock"
-    CDC_REDIS_JOB_LOCK_TTL_MS: "600000"
-    CDC_REDIS_JOB_LOCK_WAIT_TIME_MS: "100"
   envSecret:
     OTEL_EXPORTER_OTLP_HEADERS: elastic-otel-token-header
     MONGO_PASSWORD: mongo-ecommerce-password
-    REDIS_PASSWORD: redis-ecommerce-password
-    CDC_QUEUE_CONNECTION_STRING: ecommerce-storage-connection-string
   keyvault:
     name: "pagopa-u-ecommerce-kv"
     tenantId: "7788edaf-0346-4068-9d79-c868aed15b3d"
   nodeSelector: {}
   tolerations:
     - effect: "NoSchedule"
-      key: "paymentWalletOnly"
+      key: "ecommerceOnly"
       operator: "Equal"
       value: "true"
   affinity:
