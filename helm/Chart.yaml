@@ -1,5 +1,5 @@
 apiVersion: v2
-name: cdc-ecommerce
+name: pagopa-ecommerce-cdc-service
 description: Microservice that implements the change data capture on ecommerce events
 type: application
 version: 0.0.1-SNAPSHOT
