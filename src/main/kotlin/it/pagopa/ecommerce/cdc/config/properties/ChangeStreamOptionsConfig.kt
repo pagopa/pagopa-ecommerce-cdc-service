@@ -2,9 +2,7 @@ package it.pagopa.ecommerce.cdc.config.properties
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 
-/**
- * Configuration properties for MongoDB Change Stream options.
- */
+/** Configuration properties for MongoDB Change Stream options. */
 @ConfigurationProperties(prefix = "cdc.ecommerce-transactions-log-events")
 data class ChangeStreamOptionsConfig(
     // mongodb collection name to monitor for changes
