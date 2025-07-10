@@ -25,13 +25,43 @@ This repository is designed to manage and process events related to changes in e
 
 - Docker
 
-### Run docker container
+### Populate the environment
 
-Create your environment:
+The microservice needs a valid `.env` file in order to be run.
 
-```sh
-cp .env.local .env
+If you want to start the application without too much hassle, you can just copy `.env.local` with
+
+```shell
+$ cp .env.local .env
 ```
+
+to get a good default configuration.
+
+If you want to customize the application environment, reference this table:
+
+| Variable name                        | Description                                                                                                                                                | type              | default |
+|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|---------|
+| ROOT_LOGGING_LEVEL                   | Application root logger level                                                                                                                              | string            | INFO    |
+| APP_LOGGING_LEVEL                    | it.pagopa logger level                                                                                                                                     | string            | INFO    |
+| WEB_LOGGING_LEVEL                    | Web logger level                                                                                                                                           | string            | INFO    |
+| MONGO_HOST                           | Host where MongoDB instance used to persist transaction data                                                                                               | hostname (string) |         |
+| MONGO_PORT                           | Port where MongoDB is bound to in MongoDB host                                                                                                             | number            |         |
+| MONGO_USERNAME                       | MongoDB username used to connect to the database                                                                                                           | string            |         |
+| MONGO_PASSWORD                       | MongoDB password used to connect to the database                                                                                                           | string            |         |
+| MONGO_SSL_ENABLED                    | Whether SSL is enabled while connecting to MongoDB                                                                                                         | string            |         |
+| MONGO_DB_NAME                        | Mongo database name                                                                                                                                        | string            |         |
+| MONGO_MIN_POOL_SIZE                  | Min amount of connections to be retained into connection pool. See docs *                                                                                  | string            |         |
+| MONGO_MAX_POOL_SIZE                  | Max amount of connections to be retained into connection pool. See docs *                                                                                  | string            |         |
+| MONGO_MAX_IDLE_TIMEOUT_MS            | Max timeout after which an idle connection is killed in milliseconds. See docs *                                                                           | string            |         |
+| MONGO_CONNECTION_TIMEOUT_MS          | Max time to wait for a connection to be opened. See docs *                                                                                                 | string            |         |
+| MONGO_SOCKET_TIMEOUT_MS              | Max time to wait for a command send or receive before timing out. See docs *                                                                               | string            |         |
+| MONGO_SERVER_SELECTION_TIMEOUT_MS    | Max time to wait for a server to be selected while performing a communication with Mongo in milliseconds. See docs *                                       | string            |         |
+| MONGO_WAITING_QUEUE_MS               | Max time a thread has to wait for a connection to be available in milliseconds. See docs *                                                                 | string            |         |
+| MONGO_HEARTBEAT_FREQUENCY_MS         | Hearth beat frequency in milliseconds. This is an hello command that is sent periodically on each active connection to perform an health check. See docs * | string            |         |
+
+(*): for Mongo connection string options see [docs](https://www.mongodb.com/docs/drivers/java/sync/v4.3/fundamentals/connection/connection-options/#connection-options)
+
+### Run docker container
 
 From current project directory run:
 
