@@ -9,6 +9,6 @@ data class ChangeStreamOptionsConfig(
     val collection: String,
     // list of operation types to monitor (insert, update, delete, etc.)
     val operationType: List<String>,
-    /** projection fields for change stream events */
+    // projection fields for change stream events
     val project: String,
 )
