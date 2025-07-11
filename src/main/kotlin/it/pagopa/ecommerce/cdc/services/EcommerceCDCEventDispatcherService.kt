@@ -85,16 +85,17 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
                 val eventCode = event.getString("eventCode")
                 val eventClass = event.getString("_class")
                 val creationDate = event.getString("creationDate")
-                
+
                 // extract data from nested 'data' field if present
                 val data = event.get("data") as? Document
-                val email = data?.get("email")?.let { 
-                    when (it) {
-                        is String -> it
-                        is Document -> it.getString("data")
-                        else -> null
+                val email =
+                    data?.get("email")?.let {
+                        when (it) {
+                            is String -> it
+                            is Document -> it.getString("data")
+                            else -> null
+                        }
                     }
-                }
                 val paymentNotices = data?.get("paymentNotices") as? List<*>
                 val clientId = data?.getString("clientId")
 

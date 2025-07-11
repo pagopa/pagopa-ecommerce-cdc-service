@@ -75,7 +75,7 @@ class EcommerceTransactionsLogEventsStream(
                         .flatMap { changeStreamEvent ->
                             logger.debug(
                                 "Received change stream event: operationType={}",
-                                changeStreamEvent.operationType
+                                changeStreamEvent.operationType,
                             )
                             processEvent(changeStreamEvent.raw?.fullDocument)
                         }
@@ -89,16 +89,11 @@ class EcommerceTransactionsLogEventsStream(
                         )
                         .filter { t -> t is MongoException }
                         .doBeforeRetry { signal ->
-                            logger.warn(
-                                "Retrying connection to DB: ${signal.failure().message}"
-                            )
+                            logger.warn("Retrying connection to DB: ${signal.failure().message}")
                         }
                 )
                 .doOnError { e ->
-                    logger.error(
-                        "Failed to connect to DB after retries {}",
-                        e.message,
-                    )
+                    logger.error("Failed to connect to DB after retries {}", e.message)
                 }
 
         return flux
