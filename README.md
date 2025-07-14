@@ -63,12 +63,34 @@ If you want to customize the application environment, reference this table:
 
 ### Run docker container
 
-From current project directory run:
+The easiest way to test the application is through a docker container connected to the dev environment. To do so follow these steps:
 
-```sh
-docker build -t pagopa-ecommerce-cdc-service .
-docker run --env-file .env -p 8080:8080 pagopa-ecommerce-cdc-service
-```
+1. Create a `.env.dev` file starting from `.env.local` as example and replace the MongoDB values with dev environment settings:
+   ```sh
+   cp .env.local .env.dev
+   ```
+   Then update the MongoDB configuration in `.env.dev` to use the dev environment values.
+
+2. Build and run the container:
+   ```sh
+   docker build -t pagopa-ecommerce-cdc-service:latest .
+   docker run --rm -p 8080:8080 \
+     --env-file .env.dev \
+     pagopa-ecommerce-cdc-service:latest
+   ```
+
+The container will listen to dev environment changes and connect to the development MongoDB instance.
+
+### Testing the CDC Service
+
+Once the container is running, you can test the CDC functionality:
+
+1. **Make test payments** using the dev checkout environment at https://dev.checkout.pagopa.it/
+2. **Monitor CDC logs** by checking the container logs for event processing:
+   ```sh
+   docker logs -f <container_id>
+   ```
+   Look for log lines showing CDC events being processed as transactions flow through the system.
 
 ### Integration Testing with pagopa-ecommerce-local
 
