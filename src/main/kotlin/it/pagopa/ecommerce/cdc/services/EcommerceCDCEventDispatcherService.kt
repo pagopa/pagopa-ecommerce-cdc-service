@@ -100,7 +100,7 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
                     eventCode,
                     creationDate,
                     clientId,
-                    email?.let { maskEmail(it) }, // mask PII data
+                    email,
                     paymentNotices?.size ?: 0,
                 )
 
@@ -113,28 +113,5 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
             .doOnSuccess {
                 logger.debug("Successfully processed eventstore event: ${event.getString("_id")}")
             }
-    }
-
-    /**
-     * Masks email addresses for privacy compliance in logs.
-     *
-     * @param email The email address to mask
-     * @return Masked email address
-     */
-    private fun maskEmail(email: String): String {
-        return if (email.contains("@")) {
-            val parts = email.split("@")
-            val localPart = parts[0]
-            val domain = parts[1]
-            val maskedLocal =
-                if (localPart.length > 2) {
-                    localPart.take(2) + "*".repeat(localPart.length - 2)
-                } else {
-                    "*".repeat(localPart.length)
-                }
-            "$maskedLocal@$domain"
-        } else {
-            "***"
-        }
     }
 }
