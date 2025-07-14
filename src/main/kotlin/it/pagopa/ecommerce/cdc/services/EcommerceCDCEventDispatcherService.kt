@@ -31,20 +31,15 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
         if (event != null) {
             Mono.defer {
                     // extract document fields
-                    val eventId = event.getString("_id") ?: "unknown"
                     val transactionId = event.getString("transactionId") ?: "unknown"
-                    val eventCode = event.getString("eventCode") ?: "unknown"
                     val eventClass = event.getString("_class") ?: "unknown"
                     val creationDate = event.getString("creationDate") ?: "unknown"
 
                     logger.info(
-                        "Processing eventstore change event: eventId={}, transactionId={}, eventCode={}, eventType={}, creationDate={}, fullDocument={}",
-                        eventId,
+                        "Handling new change stream event: transactionId={}, eventType={}, creationDate={}",
                         transactionId,
-                        eventCode,
                         eventClass,
                         creationDate,
-                        event.toJson(),
                     )
 
                     // TODO tracing + send event to queue/topic
@@ -83,7 +78,6 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
                 val eventId = event.getString("_id")
                 val transactionId = event.getString("transactionId")
                 val eventCode = event.getString("eventCode")
-                val eventClass = event.getString("_class")
                 val creationDate = event.getString("creationDate")
 
                 // extract data from nested 'data' field if present
@@ -100,23 +94,19 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
                 val clientId = data?.getString("clientId")
 
                 logger.info(
-                    "Eventstore CDC Event Details: eventId={}, transactionId={}, eventCode={}, eventClass={}, creationDate={}, clientId={}, email={}, paymentNotices={}, processingTimestamp={}",
-                    eventId,
+                    "CDC Event Details: transactionId={}, eventId={}, eventCode={}, creationDate={}, clientId={}, email={}, paymentNotices={}",
                     transactionId,
+                    eventId,
                     eventCode,
-                    eventClass,
                     creationDate,
                     clientId,
                     email?.let { maskEmail(it) }, // mask PII data
                     paymentNotices?.size ?: 0,
-                    System.currentTimeMillis(),
                 )
 
                 // TODO future iterations will add:
-                // - Event validation and sanitization
                 // - Queue/topic publishing
                 // - View updates with Redis caching
-                // - Metrics collection
 
                 event
             }

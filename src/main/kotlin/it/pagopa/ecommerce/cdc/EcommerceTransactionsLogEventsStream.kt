@@ -36,9 +36,7 @@ class EcommerceTransactionsLogEventsStream(
         )
         this.streamEcommerceTransactionsLogEvents()
             .subscribe(
-                { document ->
-                    logger.debug("Processed transaction event: ${document.getString("_id")}")
-                },
+                {},
                 { error -> logger.error("Error in transaction change stream: ", error) },
                 { logger.info("Transaction change stream completed") },
             )
@@ -73,10 +71,6 @@ class EcommerceTransactionsLogEventsStream(
                         )
                         // Process the elements of the Flux
                         .flatMap { changeStreamEvent ->
-                            logger.debug(
-                                "Received change stream event: operationType={}",
-                                changeStreamEvent.operationType,
-                            )
                             processEvent(changeStreamEvent.raw?.fullDocument)
                         }
                         // TODO save resume token
@@ -106,7 +100,6 @@ class EcommerceTransactionsLogEventsStream(
     private fun processEvent(event: Document?): Mono<Document> {
         return if (event != null) {
             // TODO acquireEventLock
-            logger.debug("Processing transaction event: ${event.getString("_id")}")
             ecommerceCDCEventDispatcherService.dispatchEvent(event).onErrorResume { error ->
                 logger.error("Error during transaction event handling: ", error)
                 Mono.empty()
