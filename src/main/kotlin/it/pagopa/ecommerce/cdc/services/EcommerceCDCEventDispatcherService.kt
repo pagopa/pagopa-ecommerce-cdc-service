@@ -80,7 +80,7 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
                 val clientId = data?.getString("clientId")
 
                 logger.info(
-                    "CDC Event Details: transactionId: [{}], eventId: [{}], eventCode: [{}], creationDate: [{}], clientId: [{}], paymentNotices: [{}]",
+                    "CDC Event Details: transactionId: [{}], eventId: [{}], eventCode: [{}], creationDate: [{}], clientId: [{}], paymentNotices: [{}]",
                     transactionId,
                     eventId,
                     eventCode,
