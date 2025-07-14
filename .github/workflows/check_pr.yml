@@ -12,13 +12,22 @@ permissions:
   pull-requests: write
 
 jobs:
+  check_labels:
+    name: Check Required Labels
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 #v3
+      - uses: ./.github/actions/check-pr-semver-labels
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
   check_size:
     runs-on: ubuntu-latest
     name: Check Size
     steps:
 
       - name: Check PR Size
-        uses: pagopa/github-actions-template/check-pr-size@main
+        uses: pagopa/github-actions-template/check-pr-size@3fae741d94bcb9873f2447e95cc4ddea6f77be4d
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           ignored_files: 'src/test/, gradle/, gradle.lockfile, build.gradle.kts'
