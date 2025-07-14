@@ -44,13 +44,6 @@ class EcommerceCDCEventDispatcherServiceTest {
     }
 
     @Test
-    fun `should handle null event gracefully`() {
-        val result = ecommerceCDCEventDispatcherService.dispatchEvent(null)
-
-        StepVerifier.create(result).verifyComplete()
-    }
-
-    @Test
     fun `should handle events with missing fields gracefully`() {
         val documentWithMissingFields =
             EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(

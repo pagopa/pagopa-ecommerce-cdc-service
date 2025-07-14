@@ -27,44 +27,38 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
      * @param event The MongoDB change stream document containing eventstore data
      * @return Mono<Document> The processed document
      */
-    fun dispatchEvent(event: Document?): Mono<Document> =
-        if (event != null) {
-            Mono.defer {
-                    // extract document fields
-                    val transactionId = event.getString("transactionId") ?: "unknown"
-                    val eventClass = event.getString("_class") ?: "unknown"
-                    val creationDate = event.getString("creationDate") ?: "unknown"
+    fun dispatchEvent(event: Document): Mono<Document> =
+        Mono.defer {
+                // extract document fields
+                val transactionId = event.getString("transactionId") ?: "unknown"
+                val eventClass = event.getString("_class") ?: "unknown"
+                val creationDate = event.getString("creationDate") ?: "unknown"
 
-                    logger.info(
-                        "Handling new change stream event: transactionId={}, eventType={}, creationDate={}",
-                        transactionId,
-                        eventClass,
-                        creationDate,
-                    )
-
-                    // TODO tracing + send event to queue/topic
-                    processTransactionEvent(event)
-                }
-                .retryWhen(
-                    Retry.fixedDelay(
-                            retrySendPolicyConfig.maxAttempts,
-                            Duration.ofMillis(retrySendPolicyConfig.intervalInMs),
-                        )
-                        .filter { t -> t is Exception }
-                        .doBeforeRetry { signal ->
-                            logger.warn(
-                                "Retrying writing event on CDC queue due to: ${signal.failure().message}"
-                            )
-                        }
+                logger.info(
+                    "Handling new change stream event: transactionId: [{}], eventType: [{}], creationDate: [{}]",
+                    transactionId,
+                    eventClass,
+                    creationDate,
                 )
-                .doOnError { e ->
-                    logger.error("Failed to send event after retries: {}", e.message)
-                }
-                .map { event }
-        } else {
-            logger.warn("Received null transaction event for processing")
-            Mono.empty()
-        }
+
+                // TODO tracing + send event to queue/topic
+                processTransactionEvent(event)
+            }
+            .retryWhen(
+                Retry.fixedDelay(
+                        retrySendPolicyConfig.maxAttempts,
+                        Duration.ofMillis(retrySendPolicyConfig.intervalInMs),
+                    )
+                    .filter { t -> t is Exception }
+                    .doBeforeRetry { signal ->
+                        logger.warn(
+                            "Retrying writing event on CDC queue due to: [{}]",
+                            signal.failure().message,
+                        )
+                    }
+            )
+            .doOnError { e -> logger.error("Failed to send event after retries", e) }
+            .map { event }
 
     /**
      * Processes the transaction event based on its type and content. Currently implements
@@ -82,25 +76,16 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
 
                 // extract data from nested 'data' field if present
                 val data = event.get("data") as? Document
-                val email =
-                    data?.get("email")?.let {
-                        when (it) {
-                            is String -> it
-                            is Document -> it.getString("data")
-                            else -> null
-                        }
-                    }
                 val paymentNotices = data?.get("paymentNotices") as? List<*>
                 val clientId = data?.getString("clientId")
 
                 logger.info(
-                    "CDC Event Details: transactionId={}, eventId={}, eventCode={}, creationDate={}, clientId={}, email={}, paymentNotices={}",
+                    "CDC Event Details: transactionId: [{}], eventId: [{}], eventCode: [{}], creationDate: [{}], clientId: [{}], paymentNotices: [{}]",
                     transactionId,
                     eventId,
                     eventCode,
                     creationDate,
                     clientId,
-                    email,
                     paymentNotices?.size ?: 0,
                 )
 
@@ -111,7 +96,10 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
                 event
             }
             .doOnSuccess {
-                logger.debug("Successfully processed eventstore event: ${event.getString("_id")}")
+                logger.debug(
+                    "Successfully processed eventstore event: [{}]",
+                    event.getString("_id"),
+                )
             }
     }
 }

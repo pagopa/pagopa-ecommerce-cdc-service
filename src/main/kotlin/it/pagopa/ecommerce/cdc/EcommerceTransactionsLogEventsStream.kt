@@ -98,16 +98,18 @@ class EcommerceTransactionsLogEventsStream(
      * service for logging.
      */
     private fun processEvent(event: Document?): Mono<Document> {
-        return if (event != null) {
-            // TODO acquireEventLock
-            ecommerceCDCEventDispatcherService.dispatchEvent(event).onErrorResume { error ->
-                logger.error("Error during transaction event handling: ", error)
+        return Mono.defer {
+                // TODO acquireEventLock
+                event?.let { ecommerceCDCEventDispatcherService.dispatchEvent(it) }
+                    ?: run {
+                        logger.warn("Received null document from change stream")
+                        Mono.empty()
+                    }
+            }
+            .onErrorResume {
+                logger.error("Error during event handling: ", it)
                 Mono.empty()
             }
-        } else {
-            logger.warn("Received null document from change stream")
-            Mono.empty()
-        }
     }
 
     // TODO resume policy
