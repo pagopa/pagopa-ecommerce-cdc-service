@@ -1,0 +1,126 @@
+microservice-chart:
+  namespace: "ecommerce"
+  nameOverride: ""
+  fullnameOverride: "pagopa-ecommerce-cdc-service"
+  canaryDelivery:
+    create: false
+    ingress:
+      bluegreen: false
+      #set canary deployment with traffic balancing see https://github.com/kubernetes/ingress-nginx/blob/main/docs/user-guide/nginx-configuration/annotations.md#canary for more info
+      header: true
+      headerName: deployment
+      headerValue: blue
+      weightPercent: 10
+    image:
+      repository: pagopaucommonacr.azurecr.io/pagopaecommercecdcservice
+      tag: "latest"
+    envConfig:
+      OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service-blue"
+      OTEL_RESOURCE_ATTRIBUTES: "service.name=pagopa-ecommerce-cdc-service-blue,deployment.environment=uat"
+    envSecret: {}
+  image:
+    repository: pagopaucommonacr.azurecr.io/pagopaecommercecdcservice
+    tag: "0.0.1-SNAPSHOT"
+    pullPolicy: Always
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: 8080
+    initialDelaySeconds: 40
+    failureThreshold: 6
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: 8080
+    initialDelaySeconds: 40
+    failureThreshold: 6
+    periodSeconds: 10
+  deployment:
+    create: true
+  service:
+    create: true
+    type: ClusterIP
+    ports:
+      - 8080
+  ingress:
+    create: true
+    host: "weuuat.ecommerce.internal.uat.platform.pagopa.it"
+    path: /pagopa-ecommerce-cdc-service/(.*)
+    servicePort: 8080
+  serviceAccount:
+    create: false
+    annotations: {}
+    name: "ecommerce-workload-identity"
+  podAnnotations: {}
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "600m"
+    limits:
+      memory: "512Mi"
+      cpu: "300m"
+  autoscaling:
+    enable: false
+    minReplica: 1
+    maxReplica: 1
+    pollingInterval: 10 # seconds
+    cooldownPeriod: 50 # seconds
+    triggers:
+      - type: cpu
+        metadata:
+          type: Utilization # Allowed types are 'Utilization' or 'AverageValue'
+          value: "75"
+  terminationGracePeriodSeconds: 30
+  strategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  envConfig:
+    OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service"
+    OTEL_SERVICE_ENVIRONMENT: "uat"
+    OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=uat"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.otel.svc:4317"
+    OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+    OTEL_TRACES_EXPORTER: otlp
+    OTEL_METRICS_EXPORTER: otlp
+    OTEL_LOGS_EXPORTER: otlp
+    OTEL_TRACES_SAMPLER: "always_on"
+  envSecret:
+    OTEL_EXPORTER_OTLP_HEADERS: elastic-otel-token-header
+    MONGO_PASSWORD: mongo-ecommerce-password
+  keyvault:
+    name: "pagopa-u-ecommerce-kv"
+    tenantId: "7788edaf-0346-4068-9d79-c868aed15b3d"
+  nodeSelector: {}
+  tolerations:
+    - effect: "NoSchedule"
+      key: "ecommerceOnly"
+      operator: "Equal"
+      value: "true"
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: domain
+                operator: In
+                values:
+                  - ecommerce
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: pagopaecommercecdcservice
+            namespaces: ["ecommerce"]
+            topologyKey: topology.kubernetes.io/zone
+  azure:
+    workloadIdentityClientId: 42bc90bd-bc0b-419e-8728-5ce1ddb31133
