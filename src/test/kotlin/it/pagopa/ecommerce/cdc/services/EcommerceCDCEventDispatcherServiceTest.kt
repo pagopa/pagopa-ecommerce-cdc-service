@@ -267,10 +267,7 @@ class EcommerceCDCEventDispatcherServiceTest {
                     put(
                         "data",
                         Document().apply {
-                            put(
-                                "email",
-                                Document().apply { put("data", "a@example.com") },
-                            )
+                            put("email", Document().apply { put("data", "a@example.com") })
                             put("clientId", "CHECKOUT")
                         },
                     )
@@ -284,10 +281,7 @@ class EcommerceCDCEventDispatcherServiceTest {
                     put(
                         "data",
                         Document().apply {
-                            put(
-                                "email",
-                                Document().apply { put("data", "ab@example.com") },
-                            )
+                            put("email", Document().apply { put("data", "ab@example.com") })
                             put("clientId", "CHECKOUT")
                         },
                     )
@@ -314,10 +308,7 @@ class EcommerceCDCEventDispatcherServiceTest {
                     put(
                         "data",
                         Document().apply {
-                            put(
-                                "email",
-                                Document().apply { put("data", "invalid-email") },
-                            )
+                            put("email", Document().apply { put("data", "invalid-email") })
                             put("clientId", "CHECKOUT")
                         },
                     )
@@ -331,10 +322,7 @@ class EcommerceCDCEventDispatcherServiceTest {
                     put(
                         "data",
                         Document().apply {
-                            put(
-                                "email",
-                                Document().apply { put("data", "just-text") },
-                            )
+                            put("email", Document().apply { put("data", "just-text") })
                             put("clientId", "CHECKOUT")
                         },
                     )
