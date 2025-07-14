@@ -10,6 +10,7 @@ import org.bson.BsonDocument
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.Mockito.lenient
 import org.mockito.Mockito.mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
@@ -61,7 +62,9 @@ class EcommerceTransactionsLogEventsStreamTest {
                 fullDocument = sampleDocument,
             )
 
-        whenever(
+        // Use lenient stubbing since the subscription doesn't return values to test
+        lenient()
+            .whenever(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
@@ -70,14 +73,16 @@ class EcommerceTransactionsLogEventsStreamTest {
             )
             .thenReturn(Flux.just(changeStreamEvent))
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
+        lenient()
+            .whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
             .thenReturn(Mono.just(sampleDocument))
 
         val applicationReadyEvent = mock<ApplicationReadyEvent>()
 
         ecommerceTransactionsLogEventsStream.onApplicationEvent(applicationReadyEvent)
 
-        verify(reactiveMongoTemplate, timeout(5000))
+        // Just verify the method was called, not the interaction details since it's asynchronous
+        verify(reactiveMongoTemplate, timeout(2000))
             .changeStream(
                 eq("eventstore"),
                 any<ChangeStreamOptions>(),
@@ -133,7 +138,7 @@ class EcommerceTransactionsLogEventsStreamTest {
             .thenReturn(Flux.error(mongoException))
             .thenReturn(Flux.just(changeStreamEvent))
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
+        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(sampleDocument))
             .thenReturn(Mono.just(sampleDocument))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
@@ -146,6 +151,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 any<ChangeStreamOptions>(),
                 eq(BsonDocument::class.java),
             )
+        verify(ecommerceCDCEventDispatcherService).dispatchEvent(sampleDocument)
     }
 
     @Test
@@ -189,7 +195,7 @@ class EcommerceTransactionsLogEventsStreamTest {
             )
             .thenReturn(Flux.just(changeStreamEvent))
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
+        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(sampleDocument))
             .thenReturn(Mono.error(RuntimeException("Event processing failed")))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()

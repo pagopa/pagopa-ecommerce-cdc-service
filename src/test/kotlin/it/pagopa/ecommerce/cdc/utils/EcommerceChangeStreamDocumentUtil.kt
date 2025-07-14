@@ -4,6 +4,7 @@ import com.mongodb.client.model.changestream.ChangeStreamDocument
 import com.mongodb.client.model.changestream.OperationType
 import org.bson.BsonDocument
 import org.bson.Document
+import org.mockito.Mockito.lenient
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.data.mongodb.core.ChangeStreamEvent
@@ -60,11 +61,12 @@ object EcommerceChangeStreamDocumentUtil {
         val mockEvent = mock<ChangeStreamEvent<BsonDocument>>()
         val mockRaw = mock<ChangeStreamDocument<Document>>()
 
-        whenever(mockRaw.fullDocument).thenReturn(document)
+        lenient().whenever(mockRaw.fullDocument).thenReturn(document)
 
-        whenever(mockEvent.operationType)
+        lenient()
+            .whenever(mockEvent.operationType)
             .thenReturn(OperationType.valueOf(operationType.uppercase()))
-        whenever(mockEvent.raw).thenReturn(mockRaw)
+        lenient().whenever(mockEvent.raw).thenReturn(mockRaw)
 
         return mockEvent
     }
@@ -78,11 +80,12 @@ object EcommerceChangeStreamDocumentUtil {
         val mockEvent = mock<ChangeStreamEvent<BsonDocument>>()
         val mockRaw = mock<ChangeStreamDocument<Document>>()
 
-        whenever(mockRaw.fullDocument).thenReturn(null)
+        lenient().whenever(mockRaw.fullDocument).thenReturn(null)
 
-        whenever(mockEvent.operationType)
+        lenient()
+            .whenever(mockEvent.operationType)
             .thenReturn(OperationType.valueOf(operationType.uppercase()))
-        whenever(mockEvent.raw).thenReturn(mockRaw)
+        lenient().whenever(mockEvent.raw).thenReturn(mockRaw)
 
         return mockEvent
     }
