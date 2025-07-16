@@ -87,7 +87,7 @@ stages:
               echo "##[debug] Change placeholder for ecommerce-cdc-service set branch: $(BRANCH_NAME)"
               sed -i "s/^ECOMMERCE_CDC_COMMIT_SHA=.*$/ECOMMERCE_CDC_COMMIT_SHA=$(BRANCH_NAME)/" .env
             displayName: 'Change ecommerce-cdc-service branch name ecommerce-local .env'
-          - script: docker compose up pagopa-ecommerce-cdc-service pagopa-ecommerce-transactions-service pagopa-node-mock pagopa-jwt-issuer-mock mongo redis traefik azurite-init -d
+          - script: docker compose up pagopa-ecommerce-cdc-service pagopa-ecommerce-transactions-service pagopa-node-mock pagopa-jwt-issuer-mock mongo mongo-init redis traefik azurite-init -d
             displayName: 'Run app with docker-compose'
           - script: |
               # copy script from CDC service repository
