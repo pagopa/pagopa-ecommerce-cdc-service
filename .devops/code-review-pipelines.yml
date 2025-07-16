@@ -1,6 +1,7 @@
 variables:
   GRADLE_USER_HOME: $(Pipeline.Workspace)/.gradle
   GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.caching=true"
+  BRANCH_NAME: $[ replace(variables['System.PullRequest.SourceBranch'], 'refs/heads/', '') ]
 
 trigger: none
 
