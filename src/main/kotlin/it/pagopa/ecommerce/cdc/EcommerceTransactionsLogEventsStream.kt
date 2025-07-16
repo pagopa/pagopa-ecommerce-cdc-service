@@ -79,9 +79,6 @@ class EcommerceTransactionsLogEventsStream(
                         "Connecting to MongoDB Change Stream for collection: ${changeStreamOptionsConfig.collection}"
                     )
                     logger.debug(
-                        "MongoDB template connection info: ${reactiveMongoTemplate.mongoDatabase.name}"
-                    )
-                    logger.debug(
                         "Change stream options: operationType=${changeStreamOptionsConfig.operationType}, project=${changeStreamOptionsConfig.project}"
                     )
 
