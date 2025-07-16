@@ -10,11 +10,9 @@ import org.bson.BsonDocument
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.mockito.Mockito.lenient
 import org.mockito.Mockito.mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
-import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.data.mongodb.core.ChangeStreamOptions
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import reactor.core.publisher.Flux
@@ -54,7 +52,7 @@ class EcommerceTransactionsLogEventsStreamTest {
     }
 
     @Test
-    fun `should start change stream on application ready event`() {
+    fun `should start change stream on application run and process one event`() {
         val sampleDocument = EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument()
         val changeStreamEvent =
             EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
@@ -62,32 +60,32 @@ class EcommerceTransactionsLogEventsStreamTest {
                 fullDocument = sampleDocument,
             )
 
-        // Use lenient stubbing since the subscription doesn't return values to test
-        lenient()
-            .whenever(
+        val mockFlux = Flux.just(changeStreamEvent)
+
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
                     eq(BsonDocument::class.java),
                 )
             )
-            .thenReturn(Flux.just(changeStreamEvent))
+            .willReturn(mockFlux)
 
-        lenient()
-            .whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
-            .thenReturn(Mono.just(sampleDocument))
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
+            .willReturn(Mono.just(sampleDocument))
 
-        val applicationReadyEvent = mock<ApplicationReadyEvent>()
+        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
-        ecommerceTransactionsLogEventsStream.onApplicationEvent(applicationReadyEvent)
+        StepVerifier.create(result).expectNext(sampleDocument).verifyComplete()
 
-        // Just verify the method was called, not the interaction details since it's asynchronous
-        verify(reactiveMongoTemplate, timeout(2000))
+        verify(reactiveMongoTemplate, times(1))
             .changeStream(
                 eq("eventstore"),
                 any<ChangeStreamOptions>(),
                 eq(BsonDocument::class.java),
             )
+
+        verify(ecommerceCDCEventDispatcherService, times(1)).dispatchEvent(eq(sampleDocument))
     }
 
     @Test
