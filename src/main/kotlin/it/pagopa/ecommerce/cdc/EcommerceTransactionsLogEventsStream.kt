@@ -8,8 +8,8 @@ import java.time.Duration
 import org.bson.BsonDocument
 import org.bson.Document
 import org.slf4j.LoggerFactory
-import org.springframework.boot.context.event.ApplicationReadyEvent
-import org.springframework.context.ApplicationListener
+import org.springframework.boot.ApplicationArguments
+import org.springframework.boot.ApplicationRunner
 import org.springframework.data.mongodb.core.ChangeStreamOptions
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import org.springframework.data.mongodb.core.aggregation.Aggregation
@@ -26,20 +26,33 @@ class EcommerceTransactionsLogEventsStream(
     private val changeStreamOptionsConfig: ChangeStreamOptionsConfig,
     private val ecommerceCDCEventDispatcherService: EcommerceCDCEventDispatcherService,
     private val retryStreamPolicyConfig: RetryStreamPolicyConfig,
-) : ApplicationListener<ApplicationReadyEvent> {
+) : ApplicationRunner {
 
     private val logger = LoggerFactory.getLogger(EcommerceTransactionsLogEventsStream::class.java)
 
-    override fun onApplicationEvent(event: ApplicationReadyEvent) {
+    override fun run(args: ApplicationArguments) {
         logger.info(
             "Starting transaction change stream consumer for collection: ${changeStreamOptionsConfig.collection}"
         )
-        this.streamEcommerceTransactionsLogEvents()
-            .subscribe(
-                {},
-                { error -> logger.error("Error in transaction change stream: ", error) },
-                { logger.info("Transaction change stream completed") },
-            )
+        try {
+            this.streamEcommerceTransactionsLogEvents()
+                .doOnSubscribe {
+                    logger.info(
+                        "CDC service is now running and waiting for change stream events..."
+                    )
+                }
+                .doOnError { error ->
+                    logger.error("A critical error occurred in the change stream pipeline", error)
+                }
+                .doOnComplete {
+                    logger.warn(
+                        "Transaction change stream completed. The service might stop processing new events."
+                    )
+                }
+                .blockLast()
+        } catch (e: Exception) {
+            logger.error("The change stream has been terminated by a fatal error.", e)
+        }
     }
 
     /**
