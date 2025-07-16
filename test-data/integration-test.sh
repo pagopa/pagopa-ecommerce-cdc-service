@@ -70,20 +70,46 @@ check_cdc_service_running() {
     
     local cdc_status=$(docker inspect pagopa-ecommerce-cdc-service --format='{{.State.Status}}' 2>/dev/null || echo "not_found")
     
+    log_debug "CDC container status: $cdc_status"
+    
     if [ "$cdc_status" = "running" ]; then
         log_info "CDC service container is running"
         
-        local cdc_logs=$(docker logs pagopa-ecommerce-cdc-service --tail=20 2>&1)
+        # Get full logs for debugging
+        local cdc_logs=$(docker logs pagopa-ecommerce-cdc-service 2>&1)
         
+        log_debug "=== CDC Service Full Logs ==="
+        echo "$cdc_logs"
+        log_debug "=== End CDC Service Logs ==="
+        
+        # Check for the expected startup message
         if echo "$cdc_logs" | grep -q "Starting transaction change stream consumer"; then
             log_info "CDC service has started successfully"
             return 0
         else
             log_error "CDC service container is running but service hasn't started properly"
+            log_error "Expected log pattern 'Starting transaction change stream consumer' not found"
+            
+            # Additional debug info
+            log_debug "=== CDC Container Inspection ==="
+            docker inspect pagopa-ecommerce-cdc-service --format='{{json .State}}' | jq '.' 2>/dev/null || echo "Container state inspection failed"
+            
+            log_debug "=== CDC Environment Variables ==="
+            docker exec pagopa-ecommerce-cdc-service env | grep -E "(MONGO|CDC|SPRING)" 2>/dev/null || echo "Failed to get environment variables"
+            
             return 1
         fi
     else
         log_error "CDC service container is not running (status: $cdc_status)"
+        
+        if [ "$cdc_status" != "not_found" ]; then
+            log_debug "=== CDC Container Exit Info ==="
+            docker inspect pagopa-ecommerce-cdc-service --format='{{json .State}}' | jq '.' 2>/dev/null || echo "Container state inspection failed"
+            
+            log_debug "=== CDC Container Logs ==="
+            docker logs pagopa-ecommerce-cdc-service 2>&1 || echo "Failed to get container logs"
+        fi
+        
         return 1
     fi
 }

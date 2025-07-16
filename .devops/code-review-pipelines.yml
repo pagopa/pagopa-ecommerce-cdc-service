@@ -90,6 +90,25 @@ stages:
           - script: docker compose up pagopa-ecommerce-cdc-service pagopa-ecommerce-transactions-service pagopa-node-mock pagopa-jwt-issuer-mock mongo mongo-init redis traefik azurite-init -d
             displayName: 'Run app with docker-compose'
           - script: |
+              echo "=== DEBUG: Container Status Check ==="
+              docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+              echo ""
+              echo "=== DEBUG: MongoDB Status ==="
+              docker exec pagopa-ecommerce-mongo mongosh --eval "rs.status().ok" --quiet || echo "MongoDB replica set check failed"
+              echo ""
+              echo "=== DEBUG: CDC Service Environment ==="
+              docker exec pagopa-ecommerce-cdc-service env | grep -E "(MONGO|CDC|SPRING)" || echo "No CDC environment variables found"
+              echo ""
+              echo "=== DEBUG: CDC Service Full Logs (startup) ==="
+              docker logs pagopa-ecommerce-cdc-service --timestamps || echo "Failed to get CDC logs"
+              echo ""
+              echo "=== DEBUG: MongoDB Logs ==="
+              docker logs pagopa-ecommerce-mongo --tail=30 --timestamps || echo "Failed to get MongoDB logs"
+              echo ""
+              echo "=== DEBUG: mongo-init Logs ==="
+              docker logs mongo-init --timestamps || echo "Failed to get mongo-init logs"
+            displayName: 'Debug container status and logs'
+          - script: |
               # copy script from CDC service repository
               curl -o integration-test.sh https://raw.githubusercontent.com/pagopa/pagopa-ecommerce-cdc-service/$(BRANCH_NAME)/test-data/integration-test.sh
               chmod +x integration-test.sh

@@ -31,10 +31,16 @@ class EcommerceTransactionsLogEventsStream(
     private val logger = LoggerFactory.getLogger(EcommerceTransactionsLogEventsStream::class.java)
 
     override fun run(args: ApplicationArguments) {
+        logger.info("=== CDC Service Starting ===")
+        logger.info("Application arguments: ${args.sourceArgs.joinToString(", ")}")
+        logger.info("Change stream configuration: collection=${changeStreamOptionsConfig.collection}, operationType=${changeStreamOptionsConfig.operationType}")
+        
         logger.info(
             "Starting transaction change stream consumer for collection: ${changeStreamOptionsConfig.collection}"
         )
+        
         try {
+            logger.info("Attempting to create change stream...")
             this.streamEcommerceTransactionsLogEvents()
                 .doOnSubscribe {
                     logger.info(
@@ -52,6 +58,11 @@ class EcommerceTransactionsLogEventsStream(
                 .blockLast()
         } catch (e: Exception) {
             logger.error("The change stream has been terminated by a fatal error.", e)
+            logger.error("Exception details: ${e.javaClass.name}: ${e.message}")
+            if (e.cause != null) {
+                logger.error("Root cause: ${e.cause?.javaClass?.name}: ${e.cause?.message}")
+            }
+            e.printStackTrace()
         }
     }
 
@@ -65,29 +76,40 @@ class EcommerceTransactionsLogEventsStream(
                     logger.info(
                         "Connecting to MongoDB Change Stream for collection: ${changeStreamOptionsConfig.collection}"
                     )
-                    reactiveMongoTemplate
-                        .changeStream(
-                            changeStreamOptionsConfig.collection,
-                            ChangeStreamOptions.builder()
-                                .filter(
-                                    Aggregation.newAggregation(
-                                        Aggregation.match(
-                                            Criteria.where("operationType")
-                                                .`in`(changeStreamOptionsConfig.operationType)
-                                        ),
-                                        Aggregation.project(changeStreamOptionsConfig.project),
+                    logger.debug("MongoDB template connection info: ${reactiveMongoTemplate.mongoDatabase.name}")
+                    logger.debug("Change stream options: operationType=${changeStreamOptionsConfig.operationType}, project=${changeStreamOptionsConfig.project}")
+                    
+                    try {
+                        reactiveMongoTemplate
+                            .changeStream(
+                                changeStreamOptionsConfig.collection,
+                                ChangeStreamOptions.builder()
+                                    .filter(
+                                        Aggregation.newAggregation(
+                                            Aggregation.match(
+                                                Criteria.where("operationType")
+                                                    .`in`(changeStreamOptionsConfig.operationType)
+                                            ),
+                                            Aggregation.project(changeStreamOptionsConfig.project),
+                                        )
                                     )
-                                )
-                                // TODO add resume policy
-                                .build(),
-                            BsonDocument::class.java,
-                        )
-                        // Process the elements of the Flux
-                        .flatMap { changeStreamEvent ->
-                            processEvent(changeStreamEvent.raw?.fullDocument)
+                                    // TODO add resume policy
+                                    .build(),
+                                BsonDocument::class.java,
+                            )
+                            // Process the elements of the Flux
+                            .flatMap { changeStreamEvent ->
+                                processEvent(changeStreamEvent.raw?.fullDocument)
+                            }
+                            // TODO save resume token
+                            .doOnError { logger.error("Error listening to change stream: ", it) }
+                    } catch (e: Exception) {
+                        logger.error("Failed to create change stream: ${e.javaClass.name}: ${e.message}")
+                        if (e.cause != null) {
+                            logger.error("Change stream creation cause: ${e.cause?.javaClass?.name}: ${e.cause?.message}")
                         }
-                        // TODO save resume token
-                        .doOnError { logger.error("Error listening to change stream: ", it) }
+                        throw e
+                    }
                 }
                 .retryWhen(
                     Retry.fixedDelay(
@@ -97,10 +119,14 @@ class EcommerceTransactionsLogEventsStream(
                         .filter { t -> t is MongoException }
                         .doBeforeRetry { signal ->
                             logger.warn("Retrying connection to DB: ${signal.failure().message}")
+                            logger.debug("Retry attempt details: ${signal.totalRetriesInARow() + 1}/${retryStreamPolicyConfig.maxAttempts}")
                         }
                 )
                 .doOnError { e ->
-                    logger.error("Failed to connect to DB after retries {}", e.message)
+                    logger.error("Failed to connect to DB after retries: ${e.javaClass.name}: ${e.message}")
+                    if (e.cause != null) {
+                        logger.error("Final error cause: ${e.cause?.javaClass?.name}: ${e.cause?.message}")
+                    }
                 }
 
         return flux
