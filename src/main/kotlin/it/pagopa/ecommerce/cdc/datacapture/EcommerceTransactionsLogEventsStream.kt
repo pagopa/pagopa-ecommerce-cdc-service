@@ -8,8 +8,8 @@ import java.time.Duration
 import org.bson.BsonDocument
 import org.bson.Document
 import org.slf4j.LoggerFactory
-import org.springframework.boot.ApplicationArguments
-import org.springframework.boot.ApplicationRunner
+import org.springframework.boot.context.event.ApplicationReadyEvent
+import org.springframework.context.ApplicationListener
 import org.springframework.data.mongodb.core.ChangeStreamOptions
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import org.springframework.data.mongodb.core.aggregation.Aggregation
@@ -27,11 +27,12 @@ class EcommerceTransactionsLogEventsStream(
     private val changeStreamOptionsConfig: ChangeStreamOptionsConfig,
     private val ecommerceCDCEventDispatcherService: EcommerceCDCEventDispatcherService,
     private val retryStreamPolicyConfig: RetryStreamPolicyConfig,
-) : ApplicationRunner {
+) : ApplicationListener<ApplicationReadyEvent> {
 
     private val logger = LoggerFactory.getLogger(EcommerceTransactionsLogEventsStream::class.java)
 
-    override fun run(args: ApplicationArguments) {
+    override fun onApplicationEvent(event: ApplicationReadyEvent) {
+
         logger.info(
             "Starting transaction change stream consumer for collection: ${changeStreamOptionsConfig.collection}"
         )
