@@ -90,39 +90,8 @@ stages:
           - script: docker compose up pagopa-ecommerce-cdc-service pagopa-ecommerce-transactions-service pagopa-node-mock pagopa-jwt-issuer-mock mongo mongo-init redis traefik azurite-init -d
             displayName: 'Run app with docker-compose'
           - script: |
-              echo "=== DEBUG: Container Status Check ==="
-              docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-              echo ""
-              echo "=== DEBUG: Waiting for CDC service to start (30 seconds) ==="
-              sleep 30
-              echo ""
-              echo "=== DEBUG: CDC Service Container Inspection ==="
-              docker inspect pagopa-ecommerce-cdc-service --format='{{json .State}}' | jq '.'
-              echo ""
-              echo "=== DEBUG: CDC Service Environment ==="
-              docker exec pagopa-ecommerce-cdc-service env | grep -E "(MONGO|CDC|SPRING)" || echo "No CDC environment variables found"
-              echo ""
-              echo "=== DEBUG: CDC Service Full Logs (startup) ==="
-              docker logs pagopa-ecommerce-cdc-service --timestamps || echo "Failed to get CDC logs"
-              echo ""
-              echo "=== DEBUG: Check if Java process is running ==="
-              docker exec pagopa-ecommerce-cdc-service ps aux | grep java || echo "No Java process found"
-              echo ""
-              echo "=== DEBUG: Check container filesystem ==="
-              docker exec pagopa-ecommerce-cdc-service ls -la /app || echo "Failed to list /app directory"
-              echo ""
-              echo "=== DEBUG: Check if JAR file exists ==="
-              docker exec pagopa-ecommerce-cdc-service ls -la /app/*.jar || echo "No JAR file found"
-              echo ""
-              echo "=== DEBUG: MongoDB Status ==="
-              docker exec pagopa-ecommerce-mongo mongosh --eval "rs.status().ok" --quiet || echo "MongoDB replica set check failed"
-              echo ""
-              echo "=== DEBUG: MongoDB Logs ==="
-              docker logs pagopa-ecommerce-mongo --tail=30 --timestamps || echo "Failed to get MongoDB logs"
-              echo ""
-              echo "=== DEBUG: mongo-init Logs ==="
-              docker logs mongo-init --timestamps || echo "Failed to get mongo-init logs"
-            displayName: 'Debug container status and logs'
+              timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:8099/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
+            displayName: 'Health check ecommerce-cdc-service'
           - script: |
               # copy script from CDC service repository
               curl -o integration-test.sh https://raw.githubusercontent.com/pagopa/pagopa-ecommerce-cdc-service/$(BRANCH_NAME)/test-data/integration-test.sh

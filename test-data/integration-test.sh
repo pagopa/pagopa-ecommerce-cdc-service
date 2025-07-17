@@ -64,56 +64,6 @@ wait_for_service() {
     return 1
 }
 
-# check if CDC service container is running
-check_cdc_service_running() {
-    log_info "Checking if CDC service container is running..."
-    
-    local cdc_status=$(docker inspect pagopa-ecommerce-cdc-service --format='{{.State.Status}}' 2>/dev/null || echo "not_found")
-    
-    log_debug "CDC container status: $cdc_status"
-    
-    if [ "$cdc_status" = "running" ]; then
-        log_info "CDC service container is running"
-        
-        # Get full logs for debugging
-        local cdc_logs=$(docker logs pagopa-ecommerce-cdc-service 2>&1)
-        
-        log_debug "=== CDC Service Full Logs ==="
-        echo "$cdc_logs"
-        log_debug "=== End CDC Service Logs ==="
-        
-        # Check for the expected startup message
-        if echo "$cdc_logs" | grep -q "Starting transaction change stream consumer"; then
-            log_info "CDC service has started successfully"
-            return 0
-        else
-            log_error "CDC service container is running but service hasn't started properly"
-            log_error "Expected log pattern 'Starting transaction change stream consumer' not found"
-            
-            # Additional debug info
-            log_debug "=== CDC Container Inspection ==="
-            docker inspect pagopa-ecommerce-cdc-service --format='{{json .State}}' | jq '.' 2>/dev/null || echo "Container state inspection failed"
-            
-            log_debug "=== CDC Environment Variables ==="
-            docker exec pagopa-ecommerce-cdc-service env | grep -E "(MONGO|CDC|SPRING)" 2>/dev/null || echo "Failed to get environment variables"
-            
-            return 1
-        fi
-    else
-        log_error "CDC service container is not running (status: $cdc_status)"
-        
-        if [ "$cdc_status" != "not_found" ]; then
-            log_debug "=== CDC Container Exit Info ==="
-            docker inspect pagopa-ecommerce-cdc-service --format='{{json .State}}' | jq '.' 2>/dev/null || echo "Container state inspection failed"
-            
-            log_debug "=== CDC Container Logs ==="
-            docker logs pagopa-ecommerce-cdc-service 2>&1 || echo "Failed to get container logs"
-        fi
-        
-        return 1
-    fi
-}
-
 # check mongo replica set
 check_mongodb_replica_set() {
     log_info "Checking CDC MongoDB replica set status..."
@@ -323,21 +273,8 @@ EOF
 run_integration_test() {
     log_info "=== Starting CDC Integration Test ==="
     
-    # health checks
-    log_info "Step 1: Service health checks"
-    if check_cdc_service_running && \
-       wait_for_service "Transactions Service" "$TRANSACTIONS_SERVICE_URL/actuator/health/liveness" && \
-       check_mongodb_replica_set; then
-        log_info "✓ All services are healthy"
-        TEST_PASSED=$((TEST_PASSED + 1))
-    else
-        log_error "✗ Service health check failed"
-        TEST_FAILED=$((TEST_FAILED + 1))
-        return 1
-    fi
-    
     # create test transaction
-    log_info "Step 2: Transaction creation"
+    log_info "Step 1: Transaction creation"
     if create_test_transaction_via_api; then
         log_info "✓ Transaction creation successful"
         TEST_PASSED=$((TEST_PASSED + 1))
@@ -348,7 +285,7 @@ run_integration_test() {
     fi
     
     # wait for CDC processing
-    log_info "Step 3: CDC event processing"
+    log_info "Step 2: CDC event processing"
     if wait_for_cdc_processing; then
         log_info "✓ CDC event processing successful"
         TEST_PASSED=$((TEST_PASSED + 1))
@@ -359,7 +296,7 @@ run_integration_test() {
     fi
     
     # validate CDC logs
-    log_info "Step 4: CDC log validation"
+    log_info "Step 3: CDC log validation"
     if validate_cdc_logs; then
         log_info "✓ CDC log validation successful"
         TEST_PASSED=$((TEST_PASSED + 1))
@@ -370,7 +307,7 @@ run_integration_test() {
     fi
     
     # validate mongo events
-    log_info "Step 5: MongoDB event validation"
+    log_info "Step 4: MongoDB event validation"
     if validate_mongodb_events; then
         log_info "✓ MongoDB event validation successful"
         TEST_PASSED=$((TEST_PASSED + 1))
