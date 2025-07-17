@@ -308,11 +308,13 @@ class EcommerceTransactionsLogEventsStreamTest {
     fun `should execute doOnComplete callback when stream completes in run method`() {
         val spy = spy(ecommerceTransactionsLogEventsStream)
         val mockArguments = mock<ApplicationArguments>()
-        
-        doReturn(Flux.empty<org.bson.Document>()).whenever(spy).streamEcommerceTransactionsLogEvents()
-        
+
+        doReturn(Flux.empty<org.bson.Document>())
+            .whenever(spy)
+            .streamEcommerceTransactionsLogEvents()
+
         spy.run(mockArguments)
-        
+
         verify(spy).streamEcommerceTransactionsLogEvents()
     }
 }
