@@ -221,7 +221,6 @@ validate_cdc_logs() {
         "Starting transaction change stream consumer"
         "Connecting to MongoDB Change Stream"
         "transactionId.*$TEST_TRANSACTION_ID"
-        "Processing eventstore change event"
         "TRANSACTION_ACTIVATED_EVENT"
         "Successfully processed eventstore event"
     )
@@ -258,7 +257,7 @@ validate_cdc_logs() {
         return 1
     fi
     
-    # require at least 4 out of 6 patterns for success
+    # require at least 4 out of 5 patterns for success
     local min_required=4
     if [ $found_patterns -ge $min_required ]; then
         log_info "✓ CDC log validation passed ($found_patterns/${#required_patterns[@]} patterns found)"
