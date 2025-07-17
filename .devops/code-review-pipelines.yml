@@ -80,6 +80,7 @@ stages:
       - job: make_IntegrationTestEcommerceLocal
         steps:
           - checkout: pagopaEcommerceLocal
+          - script: ls && ls ./mongodb
           - script: docker compose up mongo mongo-init -d
             continueOnError: true
           - script: docker container logs pagopa-ecommerce-mongo
