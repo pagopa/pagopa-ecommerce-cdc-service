@@ -1,4 +1,4 @@
-package it.pagopa.ecommerce.cdc
+package it.pagopa.ecommerce.cdc.datacapture
 
 import com.mongodb.MongoException
 import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
@@ -7,12 +7,22 @@ import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
 import java.time.Duration
 import org.bson.BsonDocument
+import org.bson.Document
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.mockito.Mockito.mock
+import org.mockito.Mockito
 import org.mockito.junit.jupiter.MockitoExtension
-import org.mockito.kotlin.*
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.given
+import org.mockito.kotlin.never
+import org.mockito.kotlin.spy
+import org.mockito.kotlin.times
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
+import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.data.mongodb.core.ChangeStreamOptions
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import reactor.core.publisher.Flux
@@ -27,8 +37,9 @@ class EcommerceTransactionsLogEventsStreamTest {
         private const val TEST_TRANSACTION_ID_2 = "a1b2c3d4e5f6789012345678901234ab"
     }
 
-    private val reactiveMongoTemplate = mock<ReactiveMongoTemplate>()
-    private val ecommerceCDCEventDispatcherService = mock<EcommerceCDCEventDispatcherService>()
+    private val reactiveMongoTemplate = Mockito.mock<ReactiveMongoTemplate>()
+    private val ecommerceCDCEventDispatcherService =
+        Mockito.mock<EcommerceCDCEventDispatcherService>()
     private val changeStreamOptionsConfig =
         ChangeStreamOptionsConfig(
             collection = "eventstore",
@@ -301,5 +312,17 @@ class EcommerceTransactionsLogEventsStreamTest {
                 any<ChangeStreamOptions>(),
                 eq(BsonDocument::class.java),
             )
+    }
+
+    @Test
+    fun `should execute doOnComplete callback when stream completes in onApplicationEvent method`() {
+        val spy = spy(ecommerceTransactionsLogEventsStream)
+        val mockEvent = Mockito.mock<ApplicationReadyEvent>()
+
+        doReturn(Flux.empty<Document>()).whenever(spy).streamEcommerceTransactionsLogEvents()
+
+        spy.onApplicationEvent(mockEvent)
+
+        verify(spy).streamEcommerceTransactionsLogEvents()
     }
 }
