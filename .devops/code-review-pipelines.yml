@@ -81,6 +81,7 @@ stages:
         steps:
           - checkout: pagopaEcommerceLocal
           - script: docker compose up mongo mongo-init -d
+            continueOnError: true
           - script: docker container logs pagopa-ecommerce-mongo
           - script: |
               echo "##[debug] Change placeholder for ecommerce-cdc-service set branch: $(BRANCH_NAME)"
