@@ -22,7 +22,7 @@ import org.mockito.kotlin.spy
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.boot.ApplicationArguments
+import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.data.mongodb.core.ChangeStreamOptions
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import reactor.core.publisher.Flux
@@ -315,13 +315,13 @@ class EcommerceTransactionsLogEventsStreamTest {
     }
 
     @Test
-    fun `should execute doOnComplete callback when stream completes in run method`() {
+    fun `should execute doOnComplete callback when stream completes in onApplicationEvent method`() {
         val spy = spy(ecommerceTransactionsLogEventsStream)
-        val mockArguments = Mockito.mock<ApplicationArguments>()
+        val mockEvent = Mockito.mock<ApplicationReadyEvent>()
 
         doReturn(Flux.empty<Document>()).whenever(spy).streamEcommerceTransactionsLogEvents()
 
-        spy.run(mockArguments)
+        spy.onApplicationEvent(mockEvent)
 
         verify(spy).streamEcommerceTransactionsLogEvents()
     }
