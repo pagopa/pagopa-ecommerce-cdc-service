@@ -12,7 +12,7 @@ resources:
     - repository: pagopaEcommerceLocal
       type: github
       name: pagopa/pagopa-ecommerce-local
-      ref: main
+      ref: mongo-init-fi
       endpoint: 'io-azure-devops-github-ro'
 
 stages:
