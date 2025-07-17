@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mockito.mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
+import org.springframework.boot.ApplicationArguments
 import org.springframework.data.mongodb.core.ChangeStreamOptions
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import reactor.core.publisher.Flux
@@ -301,5 +302,17 @@ class EcommerceTransactionsLogEventsStreamTest {
                 any<ChangeStreamOptions>(),
                 eq(BsonDocument::class.java),
             )
+    }
+
+    @Test
+    fun `should execute doOnComplete callback when stream completes in run method`() {
+        val spy = spy(ecommerceTransactionsLogEventsStream)
+        val mockArguments = mock<ApplicationArguments>()
+        
+        doReturn(Flux.empty<org.bson.Document>()).whenever(spy).streamEcommerceTransactionsLogEvents()
+        
+        spy.run(mockArguments)
+        
+        verify(spy).streamEcommerceTransactionsLogEvents()
     }
 }
