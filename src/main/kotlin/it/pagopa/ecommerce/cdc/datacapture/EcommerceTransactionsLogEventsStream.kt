@@ -1,4 +1,4 @@
-package it.pagopa.ecommerce.cdc
+package it.pagopa.ecommerce.cdc.datacapture
 
 import com.mongodb.MongoException
 import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
@@ -17,6 +17,7 @@ import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import reactor.util.retry.Retry
 
 /** Main CDC component that listens to MongoDB Change Streams for transaction events. */
@@ -34,25 +35,20 @@ class EcommerceTransactionsLogEventsStream(
         logger.info(
             "Starting transaction change stream consumer for collection: ${changeStreamOptionsConfig.collection}"
         )
-        try {
-            this.streamEcommerceTransactionsLogEvents()
-                .doOnSubscribe {
-                    logger.info(
-                        "CDC service is now running and waiting for change stream events..."
-                    )
-                }
-                .doOnError { error ->
-                    logger.error("A critical error occurred in the change stream pipeline", error)
-                }
-                .doOnComplete {
-                    logger.warn(
-                        "Transaction change stream completed. The service might stop processing new events."
-                    )
-                }
-                .blockLast()
-        } catch (e: Exception) {
-            logger.error("The change stream has been terminated by a fatal error.", e)
-        }
+        streamEcommerceTransactionsLogEvents()
+            .doOnSubscribe {
+                logger.info("CDC service is now running and waiting for change stream events...")
+            }
+            .doOnError { error ->
+                logger.error("A critical error occurred in the change stream pipeline", error)
+            }
+            .doOnComplete {
+                logger.warn(
+                    "Transaction change stream completed. The service might stop processing new events."
+                )
+            }
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe()
     }
 
     /**
