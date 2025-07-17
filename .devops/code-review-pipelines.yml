@@ -86,6 +86,8 @@ stages:
             displayName: 'Change ecommerce-cdc-service branch name ecommerce-local .env'
           - script: docker compose up pagopa-ecommerce-cdc-service pagopa-ecommerce-transactions-service mongo azurite-init -d
             displayName: 'Run app with docker-compose'
+            continueOnError: true
+          - script: docker container logs mongo-init
           - script: |
               timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:8099/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
             displayName: 'Health check ecommerce-cdc-service'
