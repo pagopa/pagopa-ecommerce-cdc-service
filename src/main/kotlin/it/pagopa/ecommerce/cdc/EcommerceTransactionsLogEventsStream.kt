@@ -34,19 +34,25 @@ class EcommerceTransactionsLogEventsStream(
         logger.info(
             "Starting transaction change stream consumer for collection: ${changeStreamOptionsConfig.collection}"
         )
-        this.streamEcommerceTransactionsLogEvents()
-            .doOnSubscribe {
-                logger.info("CDC service is now running and waiting for change stream events...")
-            }
-            .doOnError { error ->
-                logger.error("A critical error occurred in the change stream pipeline", error)
-            }
-            .doOnComplete {
-                logger.warn(
-                    "Transaction change stream completed. The service might stop processing new events."
-                )
-            }
-            .blockLast()
+        try {
+            this.streamEcommerceTransactionsLogEvents()
+                .doOnSubscribe {
+                    logger.info(
+                        "CDC service is now running and waiting for change stream events..."
+                    )
+                }
+                .doOnError { error ->
+                    logger.error("A critical error occurred in the change stream pipeline", error)
+                }
+                .doOnComplete {
+                    logger.warn(
+                        "Transaction change stream completed. The service might stop processing new events."
+                    )
+                }
+                .blockLast()
+        } catch (e: Exception) {
+            logger.error("The change stream has been terminated by a fatal error.", e)
+        }
     }
 
     /**
