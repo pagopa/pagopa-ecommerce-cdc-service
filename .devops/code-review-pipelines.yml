@@ -13,7 +13,7 @@ resources:
     - repository: pagopaEcommerceLocal
       type: github
       name: pagopa/pagopa-ecommerce-local
-      ref: mongo-init-fi
+      ref: CHK-4331-ecommerce-cdc-mongo-configuration
       endpoint: 'io-azure-devops-github-ro'
 
 stages:
@@ -91,6 +91,7 @@ stages:
             displayName: 'Run app with docker-compose'
             continueOnError: true
           - script: docker container logs mongo-init
+          - script: docker container logs pagopa-ecommerce-cdc-service
           - script: |
               timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:8099/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
             displayName: 'Health check ecommerce-cdc-service'
