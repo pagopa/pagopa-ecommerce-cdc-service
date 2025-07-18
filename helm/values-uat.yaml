@@ -106,28 +106,15 @@ microservice-chart:
     name: "pagopa-u-ecommerce-kv"
     tenantId: "7788edaf-0346-4068-9d79-c868aed15b3d"
   nodeSelector: {}
-  tolerations:
-    - effect: "NoSchedule"
-      key: "ecommerceOnly"
-      operator: "Equal"
-      value: "true"
+  tolerations: []
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
           - matchExpressions:
-              - key: domain
+              - key: node_type
                 operator: In
                 values:
-                  - ecommerce
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchLabels:
-                app.kubernetes.io/instance: pagopaecommercecdcservice
-            namespaces: ["ecommerce"]
-            topologyKey: topology.kubernetes.io/zone
+                  - user
   azure:
-    workloadIdentityClientId: 42bc90bd-bc0b-419e-8728-5ce1ddb31133
+    workloadIdentityClientId: 449c5b65-f368-487a-881a-b03676420c53
