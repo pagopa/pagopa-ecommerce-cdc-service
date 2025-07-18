@@ -90,8 +90,6 @@ stages:
           - script: docker compose up pagopa-ecommerce-cdc-service mongo mongo-init -d
             displayName: 'Run app with docker-compose'
             continueOnError: true
-          - script: docker container logs mongo-init
-          - script: docker container logs pagopa-ecommerce-cdc-service
           - script: |
               timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:8099/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
             displayName: 'Health check ecommerce-cdc-service'
