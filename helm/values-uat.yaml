@@ -130,4 +130,4 @@ microservice-chart:
                 values:
                   - user
   azure:
-    workloadIdentityClientId: 42bc90bd-bc0b-419e-8728-5ce1ddb31133
+    workloadIdentityClientId: 449c5b65-f368-487a-881a-b03676420c53
