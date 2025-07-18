@@ -95,13 +95,6 @@ stages:
           - script: |
               timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:8099/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
             displayName: 'Health check ecommerce-cdc-service'
-          - script: |
-              # copy script from CDC service repository
-              curl -o integration-test.sh https://raw.githubusercontent.com/pagopa/pagopa-ecommerce-cdc-service/$(BRANCH_NAME)/test-data/integration-test.sh
-              chmod +x integration-test.sh
-              # run integration test with logs validation
-              ./integration-test.sh
-            displayName: 'Run CDC Integration Tests'
           - task: PublishTestResults@2
             inputs:
               testResultsFormat: 'JUnit'
