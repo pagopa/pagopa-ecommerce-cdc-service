@@ -92,7 +92,7 @@ microservice-chart:
     OTEL_METRICS_EXPORTER: otlp
     OTEL_LOGS_EXPORTER: otlp
     OTEL_TRACES_SAMPLER: "always_on"
-    CDC_LOG_EVENTS_COLLECTION_NAME: "ecommerce-transactions-log-events"
+    CDC_LOG_EVENTS_COLLECTION_NAME: "eventstore"
     CDC_LOG_EVENTS_OPERATION_TYPE: "insert,update,replace"
     CDC_LOG_EVENTS_PROJECT: "fullDocument"
     CDC_SEND_RETRY_MAX_ATTEMPTS: "1"
