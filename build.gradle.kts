@@ -31,15 +31,19 @@ dependencyLocking { lockAllConfigurations() }
 
 object Dependencies {
   const val ecsLoggingVersion = "1.6.0"
+  const val openTelemetryVersion = "1.37.0"
 }
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-data-mongodb-reactive")
   implementation("org.springframework.boot:spring-boot-starter-actuator")
+  implementation("org.springframework.boot:spring-boot-starter-webflux")
   implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
   implementation("org.jetbrains.kotlin:kotlin-reflect")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
   implementation("co.elastic.logging:logback-ecs-encoder:${Dependencies.ecsLoggingVersion}")
+  // otel api
+  implementation("io.opentelemetry:opentelemetry-api:${Dependencies.openTelemetryVersion}")
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
   testImplementation("org.springframework.boot:spring-boot-starter-test")
@@ -47,6 +51,14 @@ dependencies {
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
   testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+configurations {
+  implementation.configure {
+    exclude(module = "spring-boot-starter-web")
+    exclude("org.apache.tomcat")
+    exclude(group = "org.slf4j", module = "slf4j-simple")
+  }
 }
 
 kotlin { compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") } }
