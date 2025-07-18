@@ -101,7 +101,7 @@ Once the container is running, you can test the CDC functionality:
 
 ### Integration Testing with pagopa-ecommerce-local
 
-For comprehensive integration testing with the full eCommerce ecosystem, use the [pagopa-ecommerce-local](https://github.com/pagopa/pagopa-ecommerce-local) repository.
+For comprehensive integration testing with the full eCommerce ecosystem, you should use the [pagopa-ecommerce-local](https://github.com/pagopa/pagopa-ecommerce-local) repository.
 
 The CDC service is integrated into the local development environment and provides:
 - Complete eCommerce transaction flow
