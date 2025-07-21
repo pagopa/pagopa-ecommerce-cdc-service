@@ -30,28 +30,30 @@ repositories {
 dependencyLocking { lockAllConfigurations() }
 
 object Dependencies {
-  const val ecsLoggingVersion = "1.6.0"
-  const val openTelemetryVersion = "1.37.0"
+  const val ECS_LOGGING_VERSION = "1.6.0"
+  const val OPEN_TELEMETRY_VERSION = "1.37.0"
+  const val REDISSON_VERSION = "3.38.1"
+  const val MOCKITO_KOTLIN_VERSION = "5.2.1"
 }
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-data-mongodb-reactive")
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
-  implementation("org.redisson:redisson-spring-boot-starter:3.38.1")
-  implementation("org.redisson:redisson-spring-data:3.38.1")
+  implementation("org.redisson:redisson-spring-boot-starter:${Dependencies.REDISSON_VERSION}")
+  implementation("org.redisson:redisson-spring-data:${Dependencies.REDISSON_VERSION}")
   implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
   implementation("org.jetbrains.kotlin:kotlin-reflect")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
-  implementation("co.elastic.logging:logback-ecs-encoder:${Dependencies.ecsLoggingVersion}")
+  implementation("co.elastic.logging:logback-ecs-encoder:${Dependencies.ECS_LOGGING_VERSION}")
   // otel api
-  implementation("io.opentelemetry:opentelemetry-api:${Dependencies.openTelemetryVersion}")
+  implementation("io.opentelemetry:opentelemetry-api:${Dependencies.OPEN_TELEMETRY_VERSION}")
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("io.projectreactor:reactor-test")
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-  testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
+  testImplementation("org.mockito.kotlin:mockito-kotlin:${Dependencies.MOCKITO_KOTLIN_VERSION}")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
