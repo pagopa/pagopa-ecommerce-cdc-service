@@ -112,9 +112,22 @@ microservice-chart:
     MONGO_WAITING_QUEUE_MS: "2000"
     MONGO_HEARTBEAT_FREQUENCY_MS: "5000"
     MONGO_DB_NAME: "ecommerce"
+    REDIS_PORT: "6380"
+    REDIS_SSL_ENABLED: "true"
+    REDIS_SUB_CONN_MIN: "1"
+    REDIS_SUB_CONN_MAX: "12"
+    REDIS_SLAVE_CONN_MIN: "1"
+    REDIS_SLAVE_CONN_MAX: "12"
+    REDIS_MASTER_CONN_MIN: "1"
+    REDIS_MASTER_CONN_MAX: "12"
+    CDC_REDIS_JOB_LOCK_KEYSPACE: "ecommerceCdcEventLock"
+    CDC_REDIS_JOB_LOCK_TTL_MS: "600000"
+    CDC_REDIS_JOB_LOCK_WAIT_TIME_MS: "100"
   envSecret:
     OTEL_EXPORTER_OTLP_HEADERS: elastic-otel-token-header
     MONGO_PASSWORD: mongo-ecommerce-password
+    REDIS_HOST: redis-ecommerce-hostname
+    REDIS_PASSWORD: redis-ecommerce-access-key
   keyvault:
     name: "pagopa-d-ecommerce-kv"
     tenantId: "7788edaf-0346-4068-9d79-c868aed15b3d"
