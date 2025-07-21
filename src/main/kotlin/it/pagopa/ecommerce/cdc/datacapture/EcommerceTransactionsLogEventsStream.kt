@@ -3,6 +3,7 @@ package it.pagopa.ecommerce.cdc.datacapture
 import com.mongodb.MongoException
 import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
 import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
+import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import java.time.Duration
 import org.bson.BsonDocument
@@ -27,6 +28,7 @@ class EcommerceTransactionsLogEventsStream(
     private val changeStreamOptionsConfig: ChangeStreamOptionsConfig,
     private val ecommerceCDCEventDispatcherService: EcommerceCDCEventDispatcherService,
     private val retryStreamPolicyConfig: RetryStreamPolicyConfig,
+    private val cdcLockService: CdcLockService,
 ) : ApplicationListener<ApplicationReadyEvent> {
 
     private val logger = LoggerFactory.getLogger(EcommerceTransactionsLogEventsStream::class.java)
@@ -109,12 +111,12 @@ class EcommerceTransactionsLogEventsStream(
      */
     private fun processEvent(event: Document?): Mono<Document> {
         return Mono.defer {
-                // TODO acquireEventLock
-                event?.let { ecommerceCDCEventDispatcherService.dispatchEvent(it) }
-                    ?: run {
-                        logger.warn("Received null document from change stream")
-                        Mono.empty()
-                    }
+                event?.let { event ->
+                    cdcLockService
+                        .acquireEventLock(event.getString("_id").toString())
+                        .filter { it == true }
+                        .flatMap { ecommerceCDCEventDispatcherService.dispatchEvent(event) }
+                } ?: Mono.empty()
             }
             .onErrorResume {
                 logger.error("Error during event handling: ", it)
