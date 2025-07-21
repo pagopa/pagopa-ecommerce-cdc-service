@@ -58,6 +58,16 @@ If you want to customize the application environment, reference this table:
 | MONGO_SERVER_SELECTION_TIMEOUT_MS | Max time to wait for a server to be selected while performing a communication with Mongo in milliseconds. See docs *                                       | string            |         |
 | MONGO_WAITING_QUEUE_MS            | Max time a thread has to wait for a connection to be available in milliseconds. See docs *                                                                 | string            |         |
 | MONGO_HEARTBEAT_FREQUENCY_MS      | Hearth beat frequency in milliseconds. This is an hello command that is sent periodically on each active connection to perform an health check. See docs * | string            |         |
+| REDIS_HOST                        | Redis host name                                                                                                                                            | string            |         |
+| REDIS_PASSWORD                    | Redis password                                                                                                                                             | string            |         |
+| REDIS_PORT                        | Redis port                                                                                                                                                 | string            |         |
+| REDIS_SSL_ENABLED                 | Whether SSL is enabled while connecting to  Redis                                                                                                          | string            |         |
+| REDIS_SUB_CONN_MIN                | Redis subscription minimum connection number                                                                                                               | long              |         |
+| REDIS_SUB_CONN_MAX                | Redis subscription maximum connection number                                                                                                               | long              |         |
+| REDIS_SLAVE_CONN_MIN              | Redis slave minimum connection number                                                                                                                      | long              |         |
+| REDIS_SLAVE_CONN_MAX              | Redis slave maximum connection number                                                                                                                      | long              |         |
+| REDIS_MASTER_CONN_MIN             | Redis master minimum connection number                                                                                                                     | long              |         |
+| REDIS_MASTER_CONN_MAX             | Redis master maximum connection number                                                                                                                     | long              |         |
 | CDC_LOG_EVENTS_COLLECTION_NAME    | The name of the collection the CDC will listen to                                                                                                          | string            |         |
 | CDC_LOG_EVENTS_OPERATION_TYPE     | List of operation type the CDC will handle                                                                                                                 | list of strings   |         |
 | CDC_LOG_EVENTS_PROJECT            | The field provided by the change stream event                                                                                                              | string            |         |
@@ -65,6 +75,9 @@ If you want to customize the application environment, reference this table:
 | CDC_SEND_RETRY_INTERVAL_IN_MS     | Configurable interval in milliseconds between retries attempts                                                                                             | long              | 1000    |
 | CDC_STREAM_RETRY_MAX_ATTEMPTS     | Max configurable attempts for reconnecting to DB                                                                                                           | long              | 5       |
 | CDC_STREAM_RETRY_INTERVAL_IN_MS   | Configurable interval in milliseconds between retries attempts                                                                                             | long              | 5000    |
+| CDC_REDIS_JOB_LOCK_KEYSPACE       | Prefix used for redis key name                                                                                                                             | string            |         |
+| CDC_REDIS_JOB_LOCK_TTL_MS         | Fallbacks in milliseconds before now in case lock is not released                                                                                          | long              |         |
+| CDC_REDIS_JOB_LOCK_WAIT_TIME_MS   | Wait time in milliseconds for lock acquisition before giving up                                                                                            | long              |         |
 
 (*): for Mongo connection string options see [docs](https://www.mongodb.com/docs/drivers/java/sync/v4.3/fundamentals/connection/connection-options/#connection-options)
 
