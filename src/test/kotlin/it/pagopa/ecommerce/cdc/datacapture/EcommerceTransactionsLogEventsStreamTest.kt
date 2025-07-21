@@ -3,6 +3,7 @@ package it.pagopa.ecommerce.cdc.datacapture
 import com.mongodb.MongoException
 import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
 import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
+import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
 import java.time.Duration
@@ -17,6 +18,7 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.given
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.spy
 import org.mockito.kotlin.times
@@ -38,6 +40,7 @@ class EcommerceTransactionsLogEventsStreamTest {
     }
 
     private val reactiveMongoTemplate = Mockito.mock<ReactiveMongoTemplate>()
+    private val cdcLockService: CdcLockService = mock()
     private val ecommerceCDCEventDispatcherService =
         Mockito.mock<EcommerceCDCEventDispatcherService>()
     private val changeStreamOptionsConfig =
@@ -59,6 +62,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 changeStreamOptionsConfig,
                 ecommerceCDCEventDispatcherService,
                 retryStreamPolicyConfig,
+                cdcLockService,
             )
     }
 
@@ -82,6 +86,8 @@ class EcommerceTransactionsLogEventsStreamTest {
             )
             .willReturn(mockFlux)
 
+        given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
+
         given(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
             .willReturn(Mono.just(sampleDocument))
 
@@ -96,6 +102,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 eq(BsonDocument::class.java),
             )
 
+        verify(cdcLockService, times(1)).acquireEventLock(any())
         verify(ecommerceCDCEventDispatcherService, times(1)).dispatchEvent(eq(sampleDocument))
     }
 
@@ -117,6 +124,8 @@ class EcommerceTransactionsLogEventsStreamTest {
             )
             .thenReturn(Flux.just(changeStreamEvent))
 
+        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+
         whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
             .thenReturn(Mono.just(sampleDocument))
 
@@ -124,6 +133,7 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         StepVerifier.create(result).expectNext(sampleDocument).verifyComplete()
 
+        verify(cdcLockService).acquireEventLock(any())
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(sampleDocument)
     }
 
@@ -147,6 +157,8 @@ class EcommerceTransactionsLogEventsStreamTest {
             .thenReturn(Flux.error(mongoException))
             .thenReturn(Flux.just(changeStreamEvent))
 
+        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+
         whenever(ecommerceCDCEventDispatcherService.dispatchEvent(sampleDocument))
             .thenReturn(Mono.just(sampleDocument))
 
@@ -160,6 +172,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 any<ChangeStreamOptions>(),
                 eq(BsonDocument::class.java),
             )
+        verify(cdcLockService).acquireEventLock(any())
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(sampleDocument)
     }
 
@@ -204,6 +217,8 @@ class EcommerceTransactionsLogEventsStreamTest {
             )
             .thenReturn(Flux.just(changeStreamEvent))
 
+        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+
         whenever(ecommerceCDCEventDispatcherService.dispatchEvent(sampleDocument))
             .thenReturn(Mono.error(RuntimeException("Event processing failed")))
 
@@ -211,6 +226,7 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         StepVerifier.create(result).verifyComplete()
 
+        verify(cdcLockService).acquireEventLock(any())
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(sampleDocument)
     }
 
@@ -247,6 +263,8 @@ class EcommerceTransactionsLogEventsStreamTest {
             )
             .thenReturn(Flux.just(event1, event2))
 
+        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+
         whenever(ecommerceCDCEventDispatcherService.dispatchEvent(document1))
             .thenReturn(Mono.just(document1))
         whenever(ecommerceCDCEventDispatcherService.dispatchEvent(document2))
@@ -256,6 +274,7 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         StepVerifier.create(result).expectNext(document1).expectNext(document2).verifyComplete()
 
+        verify(cdcLockService, times(2)).acquireEventLock(any())
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(document1)
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(document2)
     }
@@ -312,6 +331,63 @@ class EcommerceTransactionsLogEventsStreamTest {
                 any<ChangeStreamOptions>(),
                 eq(BsonDocument::class.java),
             )
+    }
+
+    @Test
+    fun `should not process event when lock acquisition fails`() {
+        val sampleDocument = EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument()
+        val changeStreamEvent =
+            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
+                operationType = "insert",
+                fullDocument = sampleDocument,
+            )
+
+        whenever(
+                reactiveMongoTemplate.changeStream(
+                    any<String>(),
+                    any<ChangeStreamOptions>(),
+                    eq(BsonDocument::class.java),
+                )
+            )
+            .thenReturn(Flux.just(changeStreamEvent))
+
+        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(false))
+
+        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
+
+        StepVerifier.create(result).verifyComplete()
+
+        verify(cdcLockService).acquireEventLock(any())
+        verify(ecommerceCDCEventDispatcherService, never()).dispatchEvent(any())
+    }
+
+    @Test
+    fun `should handle lock acquisition errors gracefully`() {
+        val sampleDocument = EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument()
+        val changeStreamEvent =
+            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
+                operationType = "insert",
+                fullDocument = sampleDocument,
+            )
+
+        whenever(
+                reactiveMongoTemplate.changeStream(
+                    any<String>(),
+                    any<ChangeStreamOptions>(),
+                    eq(BsonDocument::class.java),
+                )
+            )
+            .thenReturn(Flux.just(changeStreamEvent))
+
+        whenever(cdcLockService.acquireEventLock(any()))
+            .thenReturn(Mono.error(RuntimeException("Lock service error")))
+
+        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
+
+        StepVerifier.create(result).verifyComplete()
+
+        verify(cdcLockService).acquireEventLock(any())
+        verify(ecommerceCDCEventDispatcherService, never()).dispatchEvent(any())
     }
 
     @Test
