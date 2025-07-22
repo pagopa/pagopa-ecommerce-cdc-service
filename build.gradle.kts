@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 group = "it.pagopa.ecommerce.cdc"
 
 description = "pagopa-ecommerce-cdc-service"
@@ -127,4 +129,12 @@ tasks.processResources {
   filesMatching("application.properties") {
     expand(mapOf("project.artifactId" to projectName, "project.version" to projectVersion))
   }
+}
+
+// opting into the new kotlin 2.2.0 behaviour for annotations
+// https://youtrack.jetbrains.com/issue/KT-73255/Change-defaulting-rule-for-annotations
+// https://youtrack.jetbrains.com/issue/KT-77259
+val compileKotlin: KotlinCompile by tasks
+compileKotlin.compilerOptions {
+  freeCompilerArgs.set(listOf("-Xannotation-default-target=param-property"))
 }
