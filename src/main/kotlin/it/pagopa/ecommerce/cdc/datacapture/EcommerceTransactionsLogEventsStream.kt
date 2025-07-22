@@ -33,7 +33,7 @@ class EcommerceTransactionsLogEventsStream(
     private val retryStreamPolicyConfig: RetryStreamPolicyConfig,
     private val cdcLockService: CdcLockService,
     private val redisResumePolicyService: RedisResumePolicyService,
-    @field:Value("\${cdc.resume.saveInterval}") private val saveInterval: Int,
+    @Value("\${cdc.resume.saveInterval}") private val saveInterval: Int,
 ) : ApplicationListener<ApplicationReadyEvent> {
 
     private val logger = LoggerFactory.getLogger(EcommerceTransactionsLogEventsStream::class.java)
