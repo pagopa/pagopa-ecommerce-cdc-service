@@ -5,8 +5,10 @@ import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
 import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
 import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
+import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
 import java.time.Duration
+import java.time.Instant
 import org.bson.BsonDocument
 import org.bson.Document
 import org.junit.jupiter.api.BeforeEach
@@ -41,6 +43,7 @@ class EcommerceTransactionsLogEventsStreamTest {
 
     private val reactiveMongoTemplate = Mockito.mock<ReactiveMongoTemplate>()
     private val cdcLockService: CdcLockService = mock()
+    private val redisResumePolicyService: RedisResumePolicyService = mock()
     private val ecommerceCDCEventDispatcherService =
         Mockito.mock<EcommerceCDCEventDispatcherService>()
     private val changeStreamOptionsConfig =
@@ -51,11 +54,14 @@ class EcommerceTransactionsLogEventsStreamTest {
         )
     private val retryStreamPolicyConfig =
         RetryStreamPolicyConfig(maxAttempts = 3, intervalInMs = 1000)
+    private val saveInterval = 10
 
     private lateinit var ecommerceTransactionsLogEventsStream: EcommerceTransactionsLogEventsStream
 
     @BeforeEach
     fun setup() {
+        whenever(redisResumePolicyService.getResumeTimestamp()).thenReturn(Instant.now())
+
         ecommerceTransactionsLogEventsStream =
             EcommerceTransactionsLogEventsStream(
                 reactiveMongoTemplate,
@@ -63,6 +69,8 @@ class EcommerceTransactionsLogEventsStreamTest {
                 ecommerceCDCEventDispatcherService,
                 retryStreamPolicyConfig,
                 cdcLockService,
+                redisResumePolicyService,
+                saveInterval,
             )
     }
 
