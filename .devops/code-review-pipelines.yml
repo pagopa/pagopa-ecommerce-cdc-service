@@ -99,3 +99,4 @@ stages:
               testResultsFiles: '**/*-TEST.xml'
               searchFolder: '$(System.DefaultWorkingDirectory)'
             displayName: 'Publish Integration Test Results'
+            continueOnError: true # temporarily disable "No test result files" warning
