@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mockito
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doNothing
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.given
@@ -408,5 +409,282 @@ class EcommerceTransactionsLogEventsStreamTest {
         spy.onApplicationEvent(mockEvent)
 
         verify(spy).streamEcommerceTransactionsLogEvents()
+    }
+
+    @Test
+    fun `should save resume token at save interval boundary`() {
+        // Create test documents with timestamps
+        val documents =
+            (1..12).map { i ->
+                EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
+                    eventId = "event_$i",
+                    creationDate = "2024-01-15T10:30:0${i % 10}.123Z",
+                )
+            }
+
+        val changeStreamEvents =
+            documents.map { document ->
+                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
+                    operationType = "insert",
+                    fullDocument = document,
+                )
+            }
+
+        whenever(
+                reactiveMongoTemplate.changeStream(
+                    any<String>(),
+                    any<ChangeStreamOptions>(),
+                    eq(BsonDocument::class.java),
+                )
+            )
+            .thenReturn(Flux.fromIterable(changeStreamEvents))
+
+        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+
+        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any())).thenAnswer {
+            Mono.just(it.arguments[0] as Document)
+        }
+
+        doNothing().whenever(redisResumePolicyService).saveResumeTimestamp(any())
+
+        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
+
+        StepVerifier.create(result).expectNextCount(12).verifyComplete()
+
+        // With saveInterval = 10, resume token should be saved only at positions 9 and 19
+        // (0-based indexing: 9 = 10th element, 19 = 20th element)
+        // Since we only have 12 elements, only position 9 should trigger save
+        verify(redisResumePolicyService, times(1)).saveResumeTimestamp(any())
+    }
+
+    @Test
+    fun `should not save resume token when not at interval boundary`() {
+        // Create test documents - only 5 elements, so with saveInterval = 10, no saves should occur
+        val documents =
+            (1..5).map { i ->
+                EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
+                    eventId = "event_$i",
+                    creationDate = "2024-01-15T10:30:0${i}.123Z",
+                )
+            }
+
+        val changeStreamEvents =
+            documents.map { document ->
+                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
+                    operationType = "insert",
+                    fullDocument = document,
+                )
+            }
+
+        whenever(
+                reactiveMongoTemplate.changeStream(
+                    any<String>(),
+                    any<ChangeStreamOptions>(),
+                    eq(BsonDocument::class.java),
+                )
+            )
+            .thenReturn(Flux.fromIterable(changeStreamEvents))
+
+        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+
+        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any())).thenAnswer {
+            Mono.just(it.arguments[0] as Document)
+        }
+
+        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
+
+        StepVerifier.create(result).expectNextCount(5).verifyComplete()
+
+        // With saveInterval = 10 and only 5 elements, no saves should occur
+        // (positions 0-4 don't trigger saves, need position 9 for first save)
+        verify(redisResumePolicyService, never()).saveResumeTimestamp(any())
+    }
+
+    @Test
+    fun `should handle null and blank timestamps in save token`() {
+        // Create a custom stream with saveInterval = 3 for easier testing
+        val customStream =
+            EcommerceTransactionsLogEventsStream(
+                reactiveMongoTemplate,
+                changeStreamOptionsConfig,
+                ecommerceCDCEventDispatcherService,
+                retryStreamPolicyConfig,
+                cdcLockService,
+                redisResumePolicyService,
+                3, // saveInterval = 3
+            )
+
+        // Create documents with null, empty, and blank creationDate timestamps
+        val documentWithNull =
+            EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
+                eventId = "event_null",
+                creationDate = null,
+            )
+        val documentWithEmpty =
+            EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
+                eventId = "event_empty",
+                creationDate = "",
+            )
+        val documentWithBlank =
+            EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
+                eventId = "event_blank",
+                creationDate = "   ",
+            )
+
+        val changeStreamEvents =
+            listOf(
+                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
+                    "insert",
+                    documentWithNull,
+                ),
+                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
+                    "insert",
+                    documentWithEmpty,
+                ),
+                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
+                    "insert",
+                    documentWithBlank,
+                ),
+            )
+
+        whenever(
+                reactiveMongoTemplate.changeStream(
+                    any<String>(),
+                    any<ChangeStreamOptions>(),
+                    eq(BsonDocument::class.java),
+                )
+            )
+            .thenReturn(Flux.fromIterable(changeStreamEvents))
+
+        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+
+        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any())).thenAnswer {
+            Mono.just(it.arguments[0] as Document)
+        }
+
+        doNothing().whenever(redisResumePolicyService).saveResumeTimestamp(any())
+
+        val result = customStream.streamEcommerceTransactionsLogEvents()
+
+        StepVerifier.create(result).expectNextCount(3).verifyComplete()
+
+        // With saveInterval = 3, the 3rd element (index 2) should trigger save
+        // Even with null/empty/blank timestamps, save should still occur using Instant.now()
+        // fallback
+        verify(redisResumePolicyService, times(1)).saveResumeTimestamp(any())
+    }
+
+    @Test
+    fun `should parse valid timestamp from document in save token`() {
+        // Create a custom stream with saveInterval = 1 for easier testing
+        val customStream =
+            EcommerceTransactionsLogEventsStream(
+                reactiveMongoTemplate,
+                changeStreamOptionsConfig,
+                ecommerceCDCEventDispatcherService,
+                retryStreamPolicyConfig,
+                cdcLockService,
+                redisResumePolicyService,
+                1, // saveInterval = 1
+            )
+
+        val expectedTimestamp = "2024-01-15T10:30:45.123Z"
+        val expectedInstant = Instant.parse(expectedTimestamp)
+
+        val document =
+            EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
+                eventId = "event_with_timestamp",
+                creationDate = expectedTimestamp,
+            )
+
+        val changeStreamEvent =
+            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
+                operationType = "insert",
+                fullDocument = document,
+            )
+
+        whenever(
+                reactiveMongoTemplate.changeStream(
+                    any<String>(),
+                    any<ChangeStreamOptions>(),
+                    eq(BsonDocument::class.java),
+                )
+            )
+            .thenReturn(Flux.just(changeStreamEvent))
+
+        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+
+        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
+            .thenReturn(Mono.just(document))
+
+        doNothing().whenever(redisResumePolicyService).saveResumeTimestamp(any())
+
+        val result = customStream.streamEcommerceTransactionsLogEvents()
+
+        StepVerifier.create(result).expectNext(document).verifyComplete()
+
+        // Verify that saveResumeTimestamp was called exactly once with the expected timestamp
+        verify(redisResumePolicyService, times(1)).saveResumeTimestamp(eq(expectedInstant))
+    }
+
+    @Test
+    fun `should handle save resume token errors gracefully`() {
+        // Create a custom stream with saveInterval = 1 for easier testing
+        val customStream =
+            EcommerceTransactionsLogEventsStream(
+                reactiveMongoTemplate,
+                changeStreamOptionsConfig,
+                ecommerceCDCEventDispatcherService,
+                retryStreamPolicyConfig,
+                cdcLockService,
+                redisResumePolicyService,
+                1, // saveInterval = 1
+            )
+
+        val documents =
+            (1..3).map { i ->
+                EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
+                    eventId = "event_$i",
+                    creationDate = "2024-01-15T10:30:0${i}.123Z",
+                )
+            }
+
+        val changeStreamEvents =
+            documents.map { document ->
+                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
+                    operationType = "insert",
+                    fullDocument = document,
+                )
+            }
+
+        whenever(
+                reactiveMongoTemplate.changeStream(
+                    any<String>(),
+                    any<ChangeStreamOptions>(),
+                    eq(BsonDocument::class.java),
+                )
+            )
+            .thenReturn(Flux.fromIterable(changeStreamEvents))
+
+        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+
+        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any())).thenAnswer {
+            Mono.just(it.arguments[0] as Document)
+        }
+
+        // Mock saveResumeTimestamp to throw an exception
+        whenever(redisResumePolicyService.saveResumeTimestamp(any()))
+            .thenThrow(RuntimeException("Redis connection error"))
+
+        val result = customStream.streamEcommerceTransactionsLogEvents()
+
+        // Stream should complete successfully despite the save errors - errors are caught
+        StepVerifier.create(result).verifyComplete()
+
+        // Verify that saveResumeTimestamp was called 3 times (all failed)
+        verify(redisResumePolicyService, times(3)).saveResumeTimestamp(any())
+
+        // Verify that event dispatching still occurred for all events
+        verify(ecommerceCDCEventDispatcherService, times(3)).dispatchEvent(any())
     }
 }

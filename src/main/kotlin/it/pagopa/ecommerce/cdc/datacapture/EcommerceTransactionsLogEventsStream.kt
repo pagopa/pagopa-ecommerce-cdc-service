@@ -139,7 +139,7 @@ class EcommerceTransactionsLogEventsStream(
     ): Mono<Document> {
         return Mono.defer {
                 if (changeEventFluxIndex.plus(1).mod(saveInterval) == 0) {
-                    val documentTimestamp = changeEventDocument.getString("timestamp")
+                    val documentTimestamp = changeEventDocument.getString("creationDate")
                     val resumeTimestamp =
                         if (!documentTimestamp.isNullOrBlank()) Instant.parse(documentTimestamp)
                         else Instant.now()
