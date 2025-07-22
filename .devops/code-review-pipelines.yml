@@ -13,7 +13,7 @@ resources:
     - repository: pagopaEcommerceLocal
       type: github
       name: pagopa/pagopa-ecommerce-local
-      ref: CHK-4345-add-ecommerce-cdc-locking-config
+      ref: CHK-4346-add-ecommerce-cdc-resume-values
       endpoint: 'io-azure-devops-github-ro'
 
 stages:
