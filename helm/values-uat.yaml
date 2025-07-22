@@ -124,6 +124,11 @@ microservice-chart:
     CDC_REDIS_JOB_LOCK_KEYSPACE: "ecommerceCdcEventLock"
     CDC_REDIS_JOB_LOCK_TTL_MS: "600000"
     CDC_REDIS_JOB_LOCK_WAIT_TIME_MS: "100"
+    CDC_REDIS_RESUME_KEYSPACE: "ecommerceCdcResume"
+    CDC_REDIS_RESUME_TARGET: "eventstore"
+    CDC_REDIS_RESUME_FALLBACK_IN_MIN: "60"
+    CDC_REDIS_RESUME_TTL_IN_MIN: "1440"
+    CDC_RESUME_SAVE_INTERVAL: "5"
   envSecret:
     OTEL_EXPORTER_OTLP_HEADERS: elastic-otel-token-header
     MONGO_PASSWORD: mongo-ecommerce-password
