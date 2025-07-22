@@ -80,7 +80,7 @@ stages:
     dependsOn: [ ]
     jobs:
       - job: make_IntegrationTestEcommerceLocal
-        displayName: "Integration Tests with ecommerce-local"
+        displayName: "using ecommerce-local"
         steps:
           - checkout: pagopaEcommerceLocal
           - script: |
@@ -90,14 +90,6 @@ stages:
           - script: docker compose up pagopa-ecommerce-cdc-service mongo mongo-init redis -d
             displayName: 'Run app with docker-compose'
             continueOnError: true
-          - script: |
-              echo "Waiting for services to start..."
-              sleep 10
-              echo "Checking service status..."
-              docker compose ps
-              echo "CDC Service logs:"
-              docker compose logs pagopa-ecommerce-cdc-service
-            displayName: 'Check services status and logs'
           - script: |
               timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:8099/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
             displayName: 'Health check ecommerce-cdc-service'
