@@ -80,7 +80,7 @@ stages:
     dependsOn: [ ]
     jobs:
       - job: make_IntegrationTestEcommerceLocal
-        displayName: "using ecommerce-local"
+        displayName: "Test using ecommerce-local environment"
         steps:
           - checkout: pagopaEcommerceLocal
           - script: |
@@ -96,6 +96,6 @@ stages:
           - task: PublishTestResults@2
             inputs:
               testResultsFormat: 'JUnit'
-              testResultsFiles: '**/integration-test-results.xml'
+              testResultsFiles: '**/*-TEST.xml'
               searchFolder: '$(System.DefaultWorkingDirectory)'
             displayName: 'Publish Integration Test Results'
