@@ -10,4 +10,4 @@ replicatedServersConfig:
   readMode: "MASTER"
   subscriptionMode: "MASTER"
   nodeAddresses:
-    - "rediss://${REDIS_HOST}:${REDIS_PORT}"
+    - "${REDIS_PROTOCOL}://${REDIS_HOST}:${REDIS_PORT}"
