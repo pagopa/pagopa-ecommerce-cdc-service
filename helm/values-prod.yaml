@@ -112,9 +112,9 @@ microservice-chart:
     MONGO_WAITING_QUEUE_MS: "2000"
     MONGO_HEARTBEAT_FREQUENCY_MS: "5000"
     MONGO_DB_NAME: "ecommerce"
-    REDIS_PROTOCOL: "rediss"
     REDIS_PORT: "6380"
     REDIS_SSL_ENABLED: "true"
+    # TODO fine-tune redis values after soak tests
     REDIS_SUB_CONN_MIN: "4"
     REDIS_SUB_CONN_MAX: "36"
     REDIS_SLAVE_CONN_MIN: "4"
