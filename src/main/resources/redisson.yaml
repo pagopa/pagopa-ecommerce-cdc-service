@@ -1,7 +1,7 @@
 replicatedServersConfig:
   password: ${REDIS_PASSWORD}
-  subscriptionConnectionMinimumIdleSize: ${REDIS_SLAVE_CONN_MIN}
-  subscriptionConnectionPoolSize: ${REDIS_SLAVE_CONN_MAX}
+  subscriptionConnectionMinimumIdleSize: ${REDIS_SUB_CONN_MIN}
+  subscriptionConnectionPoolSize: ${REDIS_SUB_CONN_MAX}
   slaveConnectionMinimumIdleSize: ${REDIS_SLAVE_CONN_MIN}
   slaveConnectionPoolSize: ${REDIS_SLAVE_CONN_MAX}
   masterConnectionMinimumIdleSize: ${REDIS_MASTER_CONN_MIN}

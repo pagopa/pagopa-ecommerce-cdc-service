@@ -1,7 +1,7 @@
 package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RedisJobLockPolicyConfig
-import it.pagopa.ecommerce.cdc.exceptions.LockNotAcquiredException
+import it.pagopa.ecommerce.cdc.exceptions.CdcEventProcessingLockNotAcquiredException
 import java.util.concurrent.TimeUnit
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -53,7 +53,9 @@ class CdcLockServiceTest {
 
         // Test
         val result = cdcLockService.acquireEventLock(eventId)
-        StepVerifier.create(result).expectError(LockNotAcquiredException::class.java).verify()
+        StepVerifier.create(result)
+            .expectError(CdcEventProcessingLockNotAcquiredException::class.java)
+            .verify()
 
         // verifications
         verify(redissonClient, times(1)).getLock("lockkeyspace:lock:$eventId")
@@ -69,7 +71,9 @@ class CdcLockServiceTest {
 
         // Test
         val result = cdcLockService.acquireEventLock(eventId)
-        StepVerifier.create(result).expectError(LockNotAcquiredException::class.java).verify()
+        StepVerifier.create(result)
+            .expectError(CdcEventProcessingLockNotAcquiredException::class.java)
+            .verify()
 
         // verifications
         verify(redissonClient, times(1)).getLock("lockkeyspace:lock:$eventId")
