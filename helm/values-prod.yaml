@@ -80,8 +80,8 @@ microservice-chart:
   strategy:
     type: "RollingUpdate"
     rollingUpdate:
-      maxSurge: "100%"
-      maxUnavailable: "100%"
+      maxSurge: 2
+      maxUnavailable: 0
   envConfig:
     OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service"
     OTEL_SERVICE_ENVIRONMENT: "prod"
