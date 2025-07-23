@@ -13,7 +13,7 @@ resources:
     - repository: pagopaEcommerceLocal
       type: github
       name: pagopa/pagopa-ecommerce-local
-      ref: main
+      ref: CHK-4351-add-commons-to-cdc
       endpoint: 'io-azure-devops-github-ro'
 
 stages:
@@ -45,10 +45,24 @@ stages:
                 sonar.junit.reportPaths=./build/test-results/test
             displayName: 'Prepare SonarCloud analysis'
 
+          # install commons
           - task: Gradle@3
+            displayName: 'Build and Install Commons Dependency'
             inputs:
               gradleWrapperFile: 'gradlew' # string. Alias: wrapperScript. Required. Gradle wrapper. Default: gradlew.
-              tasks: 'build' # string. Required. Tasks. Default: build.
+              tasks: 'install-commons -PbuildCommons'
+              publishJUnitResults: false
+              codeCoverageToolOption: 'None'
+              sonarQubeRunAnalysis: false
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '1.21'
+
+          # run the main build
+          - task: Gradle@3
+            displayName: 'Build, Test, and Analyze Main Project'
+            inputs:
+              gradleWrapperFile: 'gradlew'
+              tasks: 'build'
               publishJUnitResults: true
               testResultsFiles: '**/TEST-*.xml' # string. Required when publishJUnitResults = true. Test results files. Default: **/TEST-*.xml.
               codeCoverageToolOption: 'None' # 'None' | 'Cobertura' | 'JaCoCo'. Alias: codeCoverageTool. Code coverage tool. Default: None.
@@ -56,7 +70,6 @@ stages:
               javaHomeOption: 'JDKVersion' # 'JDKVersion' | 'Path'. Alias: javaHomeSelection. Required. Set JAVA_HOME by. Default: JDKVersion.
               jdkVersionOption: '1.21' # 'default' | '1.11' | '1.10' | '1.9' | '1.8' | '1.7' | '1.6'. Alias: jdkVersion. Optional. Use when javaHomeSelection = JDKVersion. JDK version. Default: default.
               sonarQubeRunAnalysis: true
-            displayName: 'Run Gradle build and tests'
 
           - task: SonarCloudPublish@3
             displayName: 'Publish SonarCloud results on build summary'

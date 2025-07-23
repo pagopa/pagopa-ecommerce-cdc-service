@@ -7,9 +7,12 @@ COPY build.gradle.kts .
 COPY settings.gradle.kts .
 COPY gradle.properties .
 COPY eclipse-style.xml eclipse-style.xml
+COPY pagopa-ecommerce-commons-maven-install.sh .
 
 COPY src/ src/
 
+RUN chmod +x ./pagopa-ecommerce-commons-maven-install.sh
+RUN ./gradlew install-commons -PbuildCommons
 RUN ./gradlew build -x test
 
 RUN mkdir build/extracted && java -Djarmode=layertools -jar build/libs/*[!-plain].jar extract --destination build/extracted
