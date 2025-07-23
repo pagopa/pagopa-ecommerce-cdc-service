@@ -47,22 +47,25 @@ stages:
 
           # install commons
           - task: Gradle@3
-            displayName: 'Build and Install Commons Dependency'
+            displayName: 'Extract commons version'
             inputs:
-              gradleWrapperFile: 'gradlew' # string. Alias: wrapperScript. Required. Gradle wrapper. Default: gradlew.
-              tasks: 'install-commons -PbuildCommons'
-              publishJUnitResults: false
-              codeCoverageToolOption: 'None'
-              sonarQubeRunAnalysis: false
+              gradleWrapperFile: 'gradlew'
+              tasks: 'printCommonsVersion -q'
               javaHomeOption: 'JDKVersion'
               jdkVersionOption: '1.21'
+            name: extractVersion
+
+          - script: |
+              COMMONS_VERSION=$(./gradlew -q printCommonsVersion)
+              chmod +x ./pagopa-ecommerce-commons-maven-install.sh
+              ./pagopa-ecommerce-commons-maven-install.sh $COMMONS_VERSION
+            displayName: 'Install ecommerce commons'
 
           # run the main build
           - task: Gradle@3
-            displayName: 'Build, Test, and Analyze Main Project'
             inputs:
-              gradleWrapperFile: 'gradlew'
-              tasks: 'build'
+              gradleWrapperFile: 'gradlew' # string. Alias: wrapperScript. Required. Gradle wrapper. Default: gradlew.
+              tasks: 'build' # string. Required. Tasks. Default: build.
               publishJUnitResults: true
               testResultsFiles: '**/TEST-*.xml' # string. Required when publishJUnitResults = true. Test results files. Default: **/TEST-*.xml.
               codeCoverageToolOption: 'None' # 'None' | 'Cobertura' | 'JaCoCo'. Alias: codeCoverageTool. Code coverage tool. Default: None.

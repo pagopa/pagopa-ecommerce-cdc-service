@@ -73,7 +73,7 @@ tasks.withType<Test> { useJUnitPlatform() }
 tasks.register<Exec>("install-commons") {
   val buildCommons = providers.gradleProperty("buildCommons")
   onlyIf("To build commons library run gradle build -PbuildCommons") { buildCommons.isPresent }
-  commandLine("sh", "./pagopa-ecommerce-commons-maven-install.sh", {Dependencies.COMMONS_VERSION})
+  commandLine("sh", "./pagopa-ecommerce-commons-maven-install.sh", { Dependencies.COMMONS_VERSION })
 }
 
 tasks.register("printCommonsVersion") {

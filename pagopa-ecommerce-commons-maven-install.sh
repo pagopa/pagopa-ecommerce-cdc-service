@@ -16,3 +16,4 @@ git checkout $version
 
 cd ../../
 rm -rf $checkoutFolder
+echo "Successfully installed ecommerce commons"
