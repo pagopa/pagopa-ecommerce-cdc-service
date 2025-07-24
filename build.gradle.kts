@@ -41,7 +41,7 @@ object Dependencies {
 val ecommerceCommonsVersion = "3.0.0"
 
 // eCommerce commons library git ref (by default tag)
-val ecommerceCommonsGitRef = "CHK-4348-add-lastProcessedEventAt-field-for-cdc"
+val ecommerceCommonsGitRef = ecommerceCommonsVersion
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-data-mongodb-reactive")
