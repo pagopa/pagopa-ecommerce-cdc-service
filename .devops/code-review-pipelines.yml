@@ -80,7 +80,7 @@ stages:
     dependsOn: [ ]
     jobs:
       - job: make_IntegrationTestEcommerceLocal
-        displayName: "Test using ecommerce-local environment"
+        displayName: "Integration test using ecommerce-local environment"
         steps:
           - checkout: pagopaEcommerceLocal
           - script: |
