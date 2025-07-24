@@ -22,7 +22,7 @@ object EcommerceChangeStreamDocumentUtil {
         transactionId: String = TEST_TRANSACTION_ID_1,
         eventCode: String = "TRANSACTION_ACTIVATED_EVENT",
         eventClass: String = "it.pagopa.ecommerce.commons.documents.v2.TransactionActivatedEvent",
-        creationDate: String = System.currentTimeMillis().toString(),
+        creationDate: String? = System.currentTimeMillis().toString(),
     ): Document {
         return Document().apply {
             put("_id", eventId)
