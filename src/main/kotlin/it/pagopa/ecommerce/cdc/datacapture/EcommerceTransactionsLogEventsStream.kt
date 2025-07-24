@@ -3,11 +3,15 @@ package it.pagopa.ecommerce.cdc.datacapture
 import com.mongodb.MongoException
 import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
 import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
+import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
+import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
 import java.time.Duration
+import java.time.Instant
 import org.bson.BsonDocument
 import org.bson.Document
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.ApplicationListener
 import org.springframework.data.mongodb.core.ChangeStreamOptions
@@ -27,6 +31,9 @@ class EcommerceTransactionsLogEventsStream(
     private val changeStreamOptionsConfig: ChangeStreamOptionsConfig,
     private val ecommerceCDCEventDispatcherService: EcommerceCDCEventDispatcherService,
     private val retryStreamPolicyConfig: RetryStreamPolicyConfig,
+    private val cdcLockService: CdcLockService,
+    private val redisResumePolicyService: RedisResumePolicyService,
+    @Value("\${cdc.resume.saveInterval}") private val saveInterval: Int,
 ) : ApplicationListener<ApplicationReadyEvent> {
 
     private val logger = LoggerFactory.getLogger(EcommerceTransactionsLogEventsStream::class.java)
@@ -75,15 +82,19 @@ class EcommerceTransactionsLogEventsStream(
                                         Aggregation.project(changeStreamOptionsConfig.project),
                                     )
                                 )
-                                // TODO add resume policy
+                                .resumeAt(redisResumePolicyService.getResumeTimestamp())
                                 .build(),
                             BsonDocument::class.java,
                         )
                         // Process the elements of the Flux
-                        .flatMap { changeStreamEvent ->
-                            processEvent(changeStreamEvent.raw?.fullDocument)
+                        .flatMap { processEvent(it.raw?.fullDocument) }
+                        // Save resume token every n emitted elements
+                        .index { changeEventFluxIndex, changeEventDocument ->
+                            Pair(changeEventFluxIndex, changeEventDocument)
                         }
-                        // TODO save resume token
+                        .flatMap { (changeEventFluxIndex, changeEventDocument) ->
+                            saveCdcResumeToken(changeEventFluxIndex, changeEventDocument)
+                        }
                         .doOnError { logger.error("Error listening to change stream: ", it) }
                 }
                 .retryWhen(
@@ -109,12 +120,12 @@ class EcommerceTransactionsLogEventsStream(
      */
     private fun processEvent(event: Document?): Mono<Document> {
         return Mono.defer {
-                // TODO acquireEventLock
-                event?.let { ecommerceCDCEventDispatcherService.dispatchEvent(it) }
-                    ?: run {
-                        logger.warn("Received null document from change stream")
-                        Mono.empty()
-                    }
+                event?.let { event ->
+                    cdcLockService
+                        .acquireEventLock(event.getString("_id").toString())
+                        .filter { it == true }
+                        .flatMap { ecommerceCDCEventDispatcherService.dispatchEvent(event) }
+                } ?: Mono.empty()
             }
             .onErrorResume {
                 logger.error("Error during event handling: ", it)
@@ -122,5 +133,24 @@ class EcommerceTransactionsLogEventsStream(
             }
     }
 
-    // TODO resume policy
+    private fun saveCdcResumeToken(
+        changeEventFluxIndex: Long,
+        changeEventDocument: Document,
+    ): Mono<Document> {
+        return Mono.defer {
+                if (changeEventFluxIndex.plus(1).mod(saveInterval) == 0) {
+                    val documentTimestamp = changeEventDocument.getString("creationDate")
+                    val resumeTimestamp =
+                        if (!documentTimestamp.isNullOrBlank()) Instant.parse(documentTimestamp)
+                        else Instant.now()
+
+                    redisResumePolicyService.saveResumeTimestamp(resumeTimestamp)
+                }
+                Mono.just(changeEventDocument)
+            }
+            .onErrorResume {
+                logger.error("Error saving resume policy: ", it)
+                Mono.empty()
+            }
+    }
 }
