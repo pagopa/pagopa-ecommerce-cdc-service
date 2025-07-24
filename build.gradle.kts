@@ -73,7 +73,7 @@ kotlin { compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") } }
 
 tasks.withType<Test> { useJUnitPlatform() }
 
-tasks.register<Exec>("installLibs") {
+tasks.register<Exec>("install-commons") {
   description = "Installs the commons library for this project."
   group = "commons"
   val buildCommons = providers.gradleProperty("buildCommons")
@@ -81,7 +81,7 @@ tasks.register<Exec>("installLibs") {
   commandLine("sh", "./pagopa-ecommerce-commons-maven-install.sh", Dependencies.COMMONS_VERSION)
 }
 
-tasks.withType<KotlinCompile> { dependsOn("installLibs") }
+//tasks.withType<KotlinCompile> { dependsOn("install-commons") }
 
 tasks.register("printCommonsVersion") {
   description = "Prints the referenced commons library version."

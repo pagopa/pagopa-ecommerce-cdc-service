@@ -47,19 +47,15 @@ stages:
 
           # install commons
           - task: Gradle@3
-            displayName: 'Extract commons version'
+            displayName: 'Build and Install Commons Dependency'
             inputs:
               gradleWrapperFile: 'gradlew'
-              tasks: 'printCommonsVersion -q'
+              tasks: 'install-commons -PbuildCommons'
+              publishJUnitResults: false
+              codeCoverageToolOption: 'None'
+              sonarQubeRunAnalysis: false
               javaHomeOption: 'JDKVersion'
               jdkVersionOption: '1.21'
-            name: extractVersion
-
-          - script: |
-              COMMONS_VERSION=$(./gradlew -q printCommonsVersion)
-              chmod +x ./pagopa-ecommerce-commons-maven-install.sh
-              ./pagopa-ecommerce-commons-maven-install.sh $COMMONS_VERSION
-            displayName: 'Install ecommerce commons'
 
           # run the main build
           - task: Gradle@3
