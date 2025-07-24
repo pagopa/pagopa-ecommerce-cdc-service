@@ -1,5 +1,4 @@
 import org.gradle.kotlin.dsl.withType
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 group = "it.pagopa.ecommerce.cdc"
 
@@ -36,8 +35,13 @@ object Dependencies {
   const val ecsLoggingVersion = "1.6.0"
   const val openTelemetryVersion = "1.37.0"
   // eCommerce commons library version
-  const val COMMONS_VERSION = "3.0.1-SNAPSHOT"
 }
+
+// eCommerce commons library version
+val ecommerceCommonsVersion = "3.0.0"
+
+// eCommerce commons library git ref (by default tag)
+val ecommerceCommonsGitRef = "CHK-4348-add-lastProcessedEventAt-field-for-cdc"
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-data-mongodb-reactive")
@@ -50,14 +54,14 @@ dependencies {
   // otel api
   implementation("io.opentelemetry:opentelemetry-api:${Dependencies.openTelemetryVersion}")
   // eCommerce commons library
-  implementation("it.pagopa:pagopa-ecommerce-commons:${Dependencies.COMMONS_VERSION}")
+  implementation("it.pagopa:pagopa-ecommerce-commons:$ecommerceCommonsVersion")
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("io.projectreactor:reactor-test")
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
   testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
-  testImplementation("it.pagopa:pagopa-ecommerce-commons:${Dependencies.COMMONS_VERSION}:tests")
+  testImplementation("it.pagopa:pagopa-ecommerce-commons:$ecommerceCommonsVersion:tests")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -74,19 +78,9 @@ kotlin { compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") } }
 tasks.withType<Test> { useJUnitPlatform() }
 
 tasks.register<Exec>("install-commons") {
-  description = "Installs the commons library for this project."
-  group = "commons"
   val buildCommons = providers.gradleProperty("buildCommons")
   onlyIf("To build commons library run gradle build -PbuildCommons") { buildCommons.isPresent }
-  commandLine("sh", "./pagopa-ecommerce-commons-maven-install.sh", Dependencies.COMMONS_VERSION)
-}
-
-//tasks.withType<KotlinCompile> { dependsOn("install-commons") }
-
-tasks.register("printCommonsVersion") {
-  description = "Prints the referenced commons library version."
-  group = "commons"
-  doLast { println(Dependencies.COMMONS_VERSION) }
+  commandLine("sh", "./pagopa-ecommerce-commons-maven-install.sh", ecommerceCommonsGitRef)
 }
 
 tasks
