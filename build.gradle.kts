@@ -34,7 +34,6 @@ dependencyLocking { lockAllConfigurations() }
 object Dependencies {
   const val ecsLoggingVersion = "1.6.0"
   const val openTelemetryVersion = "1.37.0"
-  // eCommerce commons library version
 }
 
 // eCommerce commons library version
