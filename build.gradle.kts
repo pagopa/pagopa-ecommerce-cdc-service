@@ -82,6 +82,8 @@ kotlin { compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") } }
 tasks.withType<Test> { useJUnitPlatform() }
 
 tasks.register<Exec>("install-commons") {
+  description = "Installs the commons library for this project."
+  group = "commons"
   val buildCommons = providers.gradleProperty("buildCommons")
   onlyIf("To build commons library run gradle build -PbuildCommons") { buildCommons.isPresent }
   commandLine("sh", "./pagopa-ecommerce-commons-maven-install.sh", ecommerceCommonsGitRef)
