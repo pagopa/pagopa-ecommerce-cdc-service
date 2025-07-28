@@ -24,15 +24,16 @@ stages:
         displayName: "Build and Test"
         steps:
           - task: Cache@2
+            displayName: 'Configure Gradle caching'
             inputs:
               key: 'gradle | "$(Agent.OS)" | **/build.gradle.kts' # Swap build.gradle.kts for build.gradle when using Groovy
               restoreKeys: |
                 gradle | "$(Agent.OS)"
                 gradle
               path: $(GRADLE_USER_HOME)
-            displayName: 'Configure Gradle caching'
 
           - task: SonarCloudPrepare@3
+            displayName: 'Prepare SonarCloud analysis'
             inputs:
               SonarCloud: '$(SONARCLOUD_SERVICE_CONN)'
               organization: '$(SONARCLOUD_ORG)'
@@ -43,7 +44,6 @@ stages:
                 sonar.coverage.exclusions=**/config/*,**/*Mock*,**/model/*
                 sonar.coverage.jacoco.xmlReportPaths=./build/reports/jacoco/test/jacocoTestReport.xml
                 sonar.junit.reportPaths=./build/test-results/test
-            displayName: 'Prepare SonarCloud analysis'
 
           # install commons
           - task: Gradle@3
@@ -59,6 +59,7 @@ stages:
 
           # run the main build
           - task: Gradle@3
+            displayName: 'Run Gradle build and tests'
             inputs:
               gradleWrapperFile: 'gradlew' # string. Alias: wrapperScript. Required. Gradle wrapper. Default: gradlew.
               tasks: 'build' # string. Required. Tasks. Default: build.
@@ -81,11 +82,11 @@ stages:
             displayName: 'Stop the Gradle daemon'
 
           - task: PublishCodeCoverageResults@2
+            displayName: 'Publish Code Coverage on Azure Devops'
             inputs:
               codeCoverageTool: 'JaCoCo'
               summaryFileLocation: 'build/reports/jacoco/test/jacocoTestReport.xml'
               reportDirectory: 'build/reports/jacoco/test/html'
-            displayName: 'Publish Code Coverage on Azure Devops'
 
   - stage: IntegrationTestEcommerceLocal
     displayName: "Integration Tests"
