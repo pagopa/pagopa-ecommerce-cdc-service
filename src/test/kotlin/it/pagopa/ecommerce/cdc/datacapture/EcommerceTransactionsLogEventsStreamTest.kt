@@ -9,6 +9,7 @@ import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
 import java.time.Duration
 import java.time.Instant
+import java.time.ZonedDateTime
 import org.bson.BsonDocument
 import org.bson.Document
 import org.junit.jupiter.api.BeforeEach
@@ -588,8 +589,8 @@ class EcommerceTransactionsLogEventsStreamTest {
                 1, // saveInterval = 1
             )
 
-        val expectedTimestamp = "2024-01-15T10:30:45.123Z"
-        val expectedInstant = Instant.parse(expectedTimestamp)
+        val expectedTimestamp = "2025-01-01T00:00:00.000000000Z[GMT]"
+        val expectedInstant = ZonedDateTime.parse(expectedTimestamp).toInstant()
 
         val document =
             EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
