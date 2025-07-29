@@ -152,6 +152,7 @@ class EcommerceTransactionsLogEventsStream(
                 }
                 Mono.just(changeEventDocument)
             }
+            .subscribeOn(Schedulers.boundedElastic())
             .onErrorResume {
                 logger.error("Error saving resume policy: ", it)
                 Mono.empty()
