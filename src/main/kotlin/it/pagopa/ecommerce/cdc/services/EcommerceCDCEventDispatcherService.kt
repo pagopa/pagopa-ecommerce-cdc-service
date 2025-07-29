@@ -9,6 +9,7 @@ import it.pagopa.ecommerce.commons.documents.v2.TransactionActivatedData
 import it.pagopa.ecommerce.commons.domain.Confidential
 import it.pagopa.ecommerce.commons.domain.v2.*
 import java.time.Duration
+import java.time.ZonedDateTime
 import kotlinx.coroutines.reactor.mono
 import org.bson.Document
 import org.slf4j.Logger
@@ -171,6 +172,16 @@ class EcommerceCDCEventDispatcherService(
                                 it.creationDate = creationDate
                                 it.userId = userId
                                 it.idCart = idCart
+                                if (
+                                    it.lastProcessedEventAt == null ||
+                                        it.lastProcessedEventAt!! <
+                                            ZonedDateTime.parse(creationDate)
+                                                .toInstant()
+                                                .toEpochMilli()
+                                ) {
+                                    it.lastProcessedEventAt =
+                                        ZonedDateTime.parse(creationDate).toInstant().toEpochMilli()
+                                }
                             }
                             .cast(BaseTransactionView::class.java)
                             .flatMap { t -> viewRepository.save(t) }

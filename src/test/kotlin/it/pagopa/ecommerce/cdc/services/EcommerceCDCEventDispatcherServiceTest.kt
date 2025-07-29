@@ -3,12 +3,12 @@ package it.pagopa.ecommerce.cdc.services
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
 import it.pagopa.ecommerce.cdc.repositories.TransactionsViewRepository
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
-import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import org.bson.Document
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.mock
 import reactor.test.StepVerifier
 
 @ExtendWith(MockitoExtension::class)
@@ -24,11 +24,12 @@ class EcommerceCDCEventDispatcherServiceTest {
 
     private val retrySendPolicyConfig = RetrySendPolicyConfig(maxAttempts = 3, intervalInMs = 100)
     private lateinit var ecommerceCDCEventDispatcherService: EcommerceCDCEventDispatcherService
+    private val transactionsViewRepository: TransactionsViewRepository = mock()
 
     @BeforeEach
     fun setup() {
         ecommerceCDCEventDispatcherService =
-            EcommerceCDCEventDispatcherService(,retrySendPolicyConfig)
+            EcommerceCDCEventDispatcherService(transactionsViewRepository, retrySendPolicyConfig)
     }
 
     @Test
