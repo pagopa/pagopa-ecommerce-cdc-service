@@ -1,7 +1,9 @@
 package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
+import it.pagopa.ecommerce.cdc.repositories.TransactionsViewRepository
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
+import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import org.bson.Document
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -21,13 +23,12 @@ class EcommerceCDCEventDispatcherServiceTest {
     }
 
     private val retrySendPolicyConfig = RetrySendPolicyConfig(maxAttempts = 3, intervalInMs = 100)
-
     private lateinit var ecommerceCDCEventDispatcherService: EcommerceCDCEventDispatcherService
 
     @BeforeEach
     fun setup() {
         ecommerceCDCEventDispatcherService =
-            EcommerceCDCEventDispatcherService(retrySendPolicyConfig)
+            EcommerceCDCEventDispatcherService(,retrySendPolicyConfig)
     }
 
     @Test
