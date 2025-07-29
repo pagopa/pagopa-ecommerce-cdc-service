@@ -8,6 +8,7 @@ import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
 import java.time.Duration
 import java.time.Instant
+import java.time.ZonedDateTime
 import org.bson.BsonDocument
 import org.bson.Document
 import org.slf4j.LoggerFactory
@@ -141,8 +142,11 @@ class EcommerceTransactionsLogEventsStream(
                 if (changeEventFluxIndex.plus(1).mod(saveInterval) == 0) {
                     val documentTimestamp = changeEventDocument.getString("creationDate")
                     val resumeTimestamp =
-                        if (!documentTimestamp.isNullOrBlank()) Instant.parse(documentTimestamp)
-                        else Instant.now()
+                        if (!documentTimestamp.isNullOrBlank()) {
+                            ZonedDateTime.parse(documentTimestamp).toInstant()
+                        } else {
+                            Instant.now()
+                        }
 
                     redisResumePolicyService.saveResumeTimestamp(resumeTimestamp)
                 }
