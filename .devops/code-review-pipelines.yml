@@ -24,15 +24,16 @@ stages:
         displayName: "Build and Test"
         steps:
           - task: Cache@2
+            displayName: 'Configure Gradle caching'
             inputs:
               key: 'gradle | "$(Agent.OS)" | **/build.gradle.kts' # Swap build.gradle.kts for build.gradle when using Groovy
               restoreKeys: |
                 gradle | "$(Agent.OS)"
                 gradle
               path: $(GRADLE_USER_HOME)
-            displayName: 'Configure Gradle caching'
 
           - task: SonarCloudPrepare@3
+            displayName: 'Prepare SonarCloud analysis'
             inputs:
               SonarCloud: '$(SONARCLOUD_SERVICE_CONN)'
               organization: '$(SONARCLOUD_ORG)'
@@ -43,9 +44,22 @@ stages:
                 sonar.coverage.exclusions=**/config/*,**/*Mock*,**/model/*
                 sonar.coverage.jacoco.xmlReportPaths=./build/reports/jacoco/test/jacocoTestReport.xml
                 sonar.junit.reportPaths=./build/test-results/test
-            displayName: 'Prepare SonarCloud analysis'
 
+          # install commons
           - task: Gradle@3
+            displayName: 'Build and Install Commons Dependency'
+            inputs:
+              gradleWrapperFile: 'gradlew'
+              tasks: 'install-commons -PbuildCommons'
+              publishJUnitResults: false
+              codeCoverageToolOption: 'None'
+              sonarQubeRunAnalysis: false
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '1.21'
+
+          # run the main build
+          - task: Gradle@3
+            displayName: 'Run Gradle build and tests'
             inputs:
               gradleWrapperFile: 'gradlew' # string. Alias: wrapperScript. Required. Gradle wrapper. Default: gradlew.
               tasks: 'build' # string. Required. Tasks. Default: build.
@@ -56,7 +70,6 @@ stages:
               javaHomeOption: 'JDKVersion' # 'JDKVersion' | 'Path'. Alias: javaHomeSelection. Required. Set JAVA_HOME by. Default: JDKVersion.
               jdkVersionOption: '1.21' # 'default' | '1.11' | '1.10' | '1.9' | '1.8' | '1.7' | '1.6'. Alias: jdkVersion. Optional. Use when javaHomeSelection = JDKVersion. JDK version. Default: default.
               sonarQubeRunAnalysis: true
-            displayName: 'Run Gradle build and tests'
 
           - task: SonarCloudPublish@3
             displayName: 'Publish SonarCloud results on build summary'
@@ -69,33 +82,34 @@ stages:
             displayName: 'Stop the Gradle daemon'
 
           - task: PublishCodeCoverageResults@2
+            displayName: 'Publish Code Coverage on Azure Devops'
             inputs:
               codeCoverageTool: 'JaCoCo'
               summaryFileLocation: 'build/reports/jacoco/test/jacocoTestReport.xml'
               reportDirectory: 'build/reports/jacoco/test/html'
-            displayName: 'Publish Code Coverage on Azure Devops'
 
   - stage: IntegrationTestEcommerceLocal
     displayName: "Integration Tests"
     dependsOn: [ ]
     jobs:
       - job: make_IntegrationTestEcommerceLocal
-        displayName: "Integration Tests with ecommerce-local"
+        displayName: "Integration test using ecommerce-local environment"
         steps:
           - checkout: pagopaEcommerceLocal
           - script: |
               echo "##[debug] Change placeholder for ecommerce-cdc-service set branch: $(BRANCH_NAME)"
               sed -i "s/^ECOMMERCE_CDC_COMMIT_SHA=.*$/ECOMMERCE_CDC_COMMIT_SHA=$(BRANCH_NAME)/" .env
             displayName: 'Change ecommerce-cdc-service branch name ecommerce-local .env'
-          - script: docker compose up pagopa-ecommerce-cdc-service mongo mongo-init -d
+          - script: docker compose up pagopa-ecommerce-cdc-service mongo mongo-init redis -d
             displayName: 'Run app with docker-compose'
             continueOnError: true
           - script: |
               timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:8099/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
             displayName: 'Health check ecommerce-cdc-service'
-          - task: PublishTestResults@2
-            inputs:
-              testResultsFormat: 'JUnit'
-              testResultsFiles: '**/integration-test-results.xml'
-              searchFolder: '$(System.DefaultWorkingDirectory)'
-            displayName: 'Publish Integration Test Results'
+          # TODO add this task back with full integration tests implementation
+#          - task: PublishTestResults@2
+#            inputs:
+#              testResultsFormat: 'JUnit'
+#              testResultsFiles: '**/*-TEST.xml'
+#              searchFolder: '$(System.DefaultWorkingDirectory)'
+#            displayName: 'Publish Integration Test Results'

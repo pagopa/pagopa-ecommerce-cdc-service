@@ -58,6 +58,17 @@ If you want to customize the application environment, reference this table:
 | MONGO_SERVER_SELECTION_TIMEOUT_MS | Max time to wait for a server to be selected while performing a communication with Mongo in milliseconds. See docs *                                       | string            |         |
 | MONGO_WAITING_QUEUE_MS            | Max time a thread has to wait for a connection to be available in milliseconds. See docs *                                                                 | string            |         |
 | MONGO_HEARTBEAT_FREQUENCY_MS      | Hearth beat frequency in milliseconds. This is an hello command that is sent periodically on each active connection to perform an health check. See docs * | string            |         |
+| REDIS_HOST                        | Redis host name                                                                                                                                            | string            |         |
+| REDIS_PROTOCOL                    | Redis protocol                                                                                                                                             | string            | rediss  |
+| REDIS_PASSWORD                    | Redis password                                                                                                                                             | string            |         |
+| REDIS_PORT                        | Redis port                                                                                                                                                 | string            |         |
+| REDIS_SSL_ENABLED                 | Whether SSL is enabled while connecting to  Redis                                                                                                          | string            |         |
+| REDIS_SUB_CONN_MIN                | Redis subscription minimum connection number                                                                                                               | long              |         |
+| REDIS_SUB_CONN_MAX                | Redis subscription maximum connection number                                                                                                               | long              |         |
+| REDIS_SLAVE_CONN_MIN              | Redis slave minimum connection number                                                                                                                      | long              |         |
+| REDIS_SLAVE_CONN_MAX              | Redis slave maximum connection number                                                                                                                      | long              |         |
+| REDIS_MASTER_CONN_MIN             | Redis master minimum connection number                                                                                                                     | long              |         |
+| REDIS_MASTER_CONN_MAX             | Redis master maximum connection number                                                                                                                     | long              |         |
 | CDC_LOG_EVENTS_COLLECTION_NAME    | The name of the collection the CDC will listen to                                                                                                          | string            |         |
 | CDC_LOG_EVENTS_OPERATION_TYPE     | List of operation type the CDC will handle                                                                                                                 | list of strings   |         |
 | CDC_LOG_EVENTS_PROJECT            | The field provided by the change stream event                                                                                                              | string            |         |
@@ -65,6 +76,14 @@ If you want to customize the application environment, reference this table:
 | CDC_SEND_RETRY_INTERVAL_IN_MS     | Configurable interval in milliseconds between retries attempts                                                                                             | long              | 1000    |
 | CDC_STREAM_RETRY_MAX_ATTEMPTS     | Max configurable attempts for reconnecting to DB                                                                                                           | long              | 5       |
 | CDC_STREAM_RETRY_INTERVAL_IN_MS   | Configurable interval in milliseconds between retries attempts                                                                                             | long              | 5000    |
+| CDC_REDIS_JOB_LOCK_KEYSPACE       | Prefix used for redis key name                                                                                                                             | string            |         |
+| CDC_REDIS_JOB_LOCK_TTL_MS         | Fallbacks in milliseconds before now in case lock is not released                                                                                          | long              |         |
+| CDC_REDIS_JOB_LOCK_WAIT_TIME_MS   | Wait time in milliseconds for lock acquisition before giving up                                                                                            | long              |         |
+| CDC_REDIS_RESUME_KEYSPACE         | Prefix used for redis key name                                                                                                                             | string            |         |
+| CDC_REDIS_RESUME_TARGET           | Target used as suffix for redis key name                                                                                                                   | string            |         |
+| CDC_REDIS_RESUME_FALLBACK_IN_MIN  | Fallbacks in minutes before now in case there is no resume token in cache                                                                                  | long              |         |
+| CDC_REDIS_RESUME_TTL_IN_MIN       | Time to live in minutes of Redis items                                                                                                                     | long              |         |
+| CDC_RESUME_SAVE_INTERVAL          | Interval with which the CDC saves resume token                                                                                                             | int               |         |
 
 (*): for Mongo connection string options see [docs](https://www.mongodb.com/docs/drivers/java/sync/v4.3/fundamentals/connection/connection-options/#connection-options)
 
@@ -111,7 +130,35 @@ The CDC service is integrated into the local development environment and provide
 
 When running with the full environment, the CDC service connects to shared MongoDB and integrates with all other eCommerce services.
 
----
+
+### Install eCommerce commons library locally
+
+There is a task into the Gradle build file that take cares for you of properly fetching and
+building `ecommerce-commons`. It does so by performing a repository clone, checking out to the version set into the
+build file and building the library with Maven.
+
+If you want to re-build `ecommerce-commons` library you can run the build command with a `-PbuildCommons`.
+
+This two properties maps `ecommerce-commons` version and git ref:
+
+````
+val ecommerceCommonsVersion = "x.y.z" -> valued with ecommerce commons wanted pom version
+val ecommerceCommonsGitRef = ecommerceCommonsVersion -> the branch/tag to be checkout.
+````
+
+`ecommerceCommonsGitRef` has by default the same value as `ecommerceCommonsVersion`, so that version tagged
+with `"x.y.z"` will be checked out and installed locally.
+
+This value was left as a separate property because, during developing phases can be changed to a feature branch
+making the local build use a ref branch other than a tag for developing purpose.
+
+```Shell
+$ ./gradlew build -PbuildCommons
+```
+
+Running the above command the version above task will run before project compilation building eCommerce commons locally
+inside maven local repository
+
 ### Dependency management 🔧
 
 For support reproducible build this project has the following gradle feature enabled:

@@ -1,3 +1,6 @@
+import org.gradle.kotlin.dsl.withType
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 group = "it.pagopa.ecommerce.cdc"
 
 description = "pagopa-ecommerce-cdc-service"
@@ -30,26 +33,39 @@ repositories {
 dependencyLocking { lockAllConfigurations() }
 
 object Dependencies {
-  const val ecsLoggingVersion = "1.6.0"
-  const val openTelemetryVersion = "1.37.0"
+  const val ECS_LOGGING_VERSION = "1.6.0"
+  const val OPEN_TELEMETRY_VERSION = "1.37.0"
+  const val REDISSON_VERSION = "3.38.1"
+  const val MOCKITO_KOTLIN_VERSION = "5.2.1"
 }
+
+// eCommerce commons library version
+val ecommerceCommonsVersion = "3.0.0"
+
+// eCommerce commons library git ref (by default tag)
+val ecommerceCommonsGitRef = ecommerceCommonsVersion
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-data-mongodb-reactive")
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
+  implementation("org.redisson:redisson-spring-boot-starter:${Dependencies.REDISSON_VERSION}")
+  implementation("org.redisson:redisson-spring-data:${Dependencies.REDISSON_VERSION}")
   implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
   implementation("org.jetbrains.kotlin:kotlin-reflect")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
-  implementation("co.elastic.logging:logback-ecs-encoder:${Dependencies.ecsLoggingVersion}")
+  implementation("co.elastic.logging:logback-ecs-encoder:${Dependencies.ECS_LOGGING_VERSION}")
   // otel api
-  implementation("io.opentelemetry:opentelemetry-api:${Dependencies.openTelemetryVersion}")
+  implementation("io.opentelemetry:opentelemetry-api:${Dependencies.OPEN_TELEMETRY_VERSION}")
+  // eCommerce commons library
+  implementation("it.pagopa:pagopa-ecommerce-commons:$ecommerceCommonsVersion")
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("io.projectreactor:reactor-test")
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-  testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
+  testImplementation("it.pagopa:pagopa-ecommerce-commons:$ecommerceCommonsVersion:tests")
+  testImplementation("org.mockito.kotlin:mockito-kotlin:${Dependencies.MOCKITO_KOTLIN_VERSION}")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -64,6 +80,14 @@ configurations {
 kotlin { compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") } }
 
 tasks.withType<Test> { useJUnitPlatform() }
+
+tasks.register<Exec>("install-commons") {
+  description = "Installs the commons library for this project."
+  group = "commons"
+  val buildCommons = providers.gradleProperty("buildCommons")
+  onlyIf("To build commons library run gradle build -PbuildCommons") { buildCommons.isPresent }
+  commandLine("sh", "./pagopa-ecommerce-commons-maven-install.sh", ecommerceCommonsGitRef)
+}
 
 tasks
   .register("applySemanticVersionPlugin") { dependsOn("prepareKotlinBuildScriptModel") }
@@ -123,4 +147,13 @@ tasks.processResources {
   filesMatching("application.properties") {
     expand(mapOf("project.artifactId" to projectName, "project.version" to projectVersion))
   }
+}
+
+// opting into the new kotlin 2.2.0 behaviour for annotations
+// https://youtrack.jetbrains.com/issue/KT-73255/Change-defaulting-rule-for-annotations
+// https://youtrack.jetbrains.com/issue/KT-77259
+val compileKotlin: KotlinCompile by tasks
+
+compileKotlin.compilerOptions {
+  freeCompilerArgs.set(listOf("-Xannotation-default-target=param-property"))
 }

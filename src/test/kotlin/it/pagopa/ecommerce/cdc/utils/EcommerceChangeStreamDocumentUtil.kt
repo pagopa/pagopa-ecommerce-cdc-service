@@ -2,6 +2,7 @@ package it.pagopa.ecommerce.cdc.utils
 
 import com.mongodb.client.model.changestream.ChangeStreamDocument
 import com.mongodb.client.model.changestream.OperationType
+import java.time.ZonedDateTime
 import org.bson.BsonDocument
 import org.bson.Document
 import org.mockito.Mockito.lenient
@@ -22,7 +23,7 @@ object EcommerceChangeStreamDocumentUtil {
         transactionId: String = TEST_TRANSACTION_ID_1,
         eventCode: String = "TRANSACTION_ACTIVATED_EVENT",
         eventClass: String = "it.pagopa.ecommerce.commons.documents.v2.TransactionActivatedEvent",
-        creationDate: String = System.currentTimeMillis().toString(),
+        creationDate: String? = ZonedDateTime.now().toString(),
     ): Document {
         return Document().apply {
             put("_id", eventId)
