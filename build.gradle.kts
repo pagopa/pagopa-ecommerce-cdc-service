@@ -1,3 +1,4 @@
+import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 group = "it.pagopa.ecommerce.cdc"
@@ -38,6 +39,12 @@ object Dependencies {
   const val MOCKITO_KOTLIN_VERSION = "5.2.1"
 }
 
+// eCommerce commons library version
+val ecommerceCommonsVersion = "3.0.0"
+
+// eCommerce commons library git ref (by default tag)
+val ecommerceCommonsGitRef = ecommerceCommonsVersion
+
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-data-mongodb-reactive")
   implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -50,11 +57,14 @@ dependencies {
   implementation("co.elastic.logging:logback-ecs-encoder:${Dependencies.ECS_LOGGING_VERSION}")
   // otel api
   implementation("io.opentelemetry:opentelemetry-api:${Dependencies.OPEN_TELEMETRY_VERSION}")
+  // eCommerce commons library
+  implementation("it.pagopa:pagopa-ecommerce-commons:$ecommerceCommonsVersion")
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("io.projectreactor:reactor-test")
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+  testImplementation("it.pagopa:pagopa-ecommerce-commons:$ecommerceCommonsVersion:tests")
   testImplementation("org.mockito.kotlin:mockito-kotlin:${Dependencies.MOCKITO_KOTLIN_VERSION}")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
@@ -70,6 +80,14 @@ configurations {
 kotlin { compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") } }
 
 tasks.withType<Test> { useJUnitPlatform() }
+
+tasks.register<Exec>("install-commons") {
+  description = "Installs the commons library for this project."
+  group = "commons"
+  val buildCommons = providers.gradleProperty("buildCommons")
+  onlyIf("To build commons library run gradle build -PbuildCommons") { buildCommons.isPresent }
+  commandLine("sh", "./pagopa-ecommerce-commons-maven-install.sh", ecommerceCommonsGitRef)
+}
 
 tasks
   .register("applySemanticVersionPlugin") { dependsOn("prepareKotlinBuildScriptModel") }

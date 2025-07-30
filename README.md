@@ -130,7 +130,35 @@ The CDC service is integrated into the local development environment and provide
 
 When running with the full environment, the CDC service connects to shared MongoDB and integrates with all other eCommerce services.
 
----
+
+### Install eCommerce commons library locally
+
+There is a task into the Gradle build file that take cares for you of properly fetching and
+building `ecommerce-commons`. It does so by performing a repository clone, checking out to the version set into the
+build file and building the library with Maven.
+
+If you want to re-build `ecommerce-commons` library you can run the build command with a `-PbuildCommons`.
+
+This two properties maps `ecommerce-commons` version and git ref:
+
+````
+val ecommerceCommonsVersion = "x.y.z" -> valued with ecommerce commons wanted pom version
+val ecommerceCommonsGitRef = ecommerceCommonsVersion -> the branch/tag to be checkout.
+````
+
+`ecommerceCommonsGitRef` has by default the same value as `ecommerceCommonsVersion`, so that version tagged
+with `"x.y.z"` will be checked out and installed locally.
+
+This value was left as a separate property because, during developing phases can be changed to a feature branch
+making the local build use a ref branch other than a tag for developing purpose.
+
+```Shell
+$ ./gradlew build -PbuildCommons
+```
+
+Running the above command the version above task will run before project compilation building eCommerce commons locally
+inside maven local repository
+
 ### Dependency management 🔧
 
 For support reproducible build this project has the following gradle feature enabled:
