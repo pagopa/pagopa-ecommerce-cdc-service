@@ -1,6 +1,12 @@
 package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.documents.BaseTransactionView
+import it.pagopa.ecommerce.commons.documents.PaymentNotice
+import it.pagopa.ecommerce.commons.documents.PaymentTransferInformation
+import it.pagopa.ecommerce.commons.documents.v2.Transaction
+import it.pagopa.ecommerce.commons.domain.Confidential
+import it.pagopa.ecommerce.commons.domain.v2.Email
+import it.pagopa.ecommerce.commons.generated.server.model.TransactionStatusDto
 import java.time.ZonedDateTime
 import org.bson.Document
 import org.slf4j.LoggerFactory
@@ -14,6 +20,10 @@ import reactor.core.publisher.Mono
 /**
  * Service for performing upsert operations on transaction views with efficient atomic upsert
  * operations using native MongoDB queries.
+ *
+ * TODO PRODUCTION - Currently writes to "cdc-transactions-view" clone collection for DEV/UAT
+ * testing. For production deployment, change ACTIVATION events to write to "transactions-view"
+ * collection to replace the existing transactions-service view updates.
  */
 @Service
 class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTemplate) {
@@ -29,7 +39,7 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
      * @return Mono<Void> Completes when the upsert operation succeeds
      */
     fun upsertEventData(transactionId: String, event: Document): Mono<Void> {
-        return Mono.defer {
+        return Mono.defer<Void> {
                 val eventCode = event.getString("eventCode") ?: "UNKNOWN"
 
                 logger.debug(
@@ -38,23 +48,41 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
                     eventCode,
                 )
 
-                val query = Query.query(Criteria.where("transactionId").`is`(transactionId))
-                val update = buildUpdateFromEvent(event)
+                // for ACTIVATE events (first of the payment flow), create Transaction object
+                if (eventCode == "TRANSACTION_ACTIVATED_EVENT") {
+                    createTransactionFromActivationEvent(transactionId, event)
+                        .flatMap { transaction ->
+                            // TODO change to "transactions-view" collection for prod
+                            mongoTemplate.save(transaction, "cdc-transactions-view").doOnNext {
+                                savedTransaction ->
+                                logger.debug(
+                                    "Transaction created via mongoTemplate.save() for transactionId: [{}] in cdc-transactions-view",
+                                    transactionId,
+                                )
+                            }
+                        }
+                        .then()
+                } else {
+                    // for other events (after ACTIVATE), use upsert operations
+                    // TODO verify collection targeting for prod deployment
+                    val query = Query.query(Criteria.where("transactionId").`is`(transactionId))
+                    val update = buildUpdateFromEvent(event)
 
-                (mongoTemplate.upsert(query, update, BaseTransactionView::class.java))
-                    .doOnNext { updateResult ->
-                        logger.debug(
-                            "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
-                            transactionId,
-                            eventCode,
-                            updateResult.matchedCount,
-                            updateResult.modifiedCount,
-                            updateResult.upsertedId != null,
-                        )
-                    }
-                    .then()
+                    (mongoTemplate.upsert(query, update, BaseTransactionView::class.java))
+                        .doOnNext { updateResult ->
+                            logger.debug(
+                                "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
+                                transactionId,
+                                eventCode,
+                                updateResult.matchedCount,
+                                updateResult.modifiedCount,
+                                updateResult.upsertedId != null,
+                            )
+                        }
+                        .then()
+                }
             }
-            .doOnSuccess {
+            .doOnSuccess { _ ->
                 logger.info("Successfully upserted transaction view for _id: [{}]", transactionId)
             }
             .doOnError { error ->
@@ -445,5 +473,91 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
         data?.let { update.set("lastEventData", it) }
 
         return update
+    }
+
+    /**
+     * Creates a Transaction object from TRANSACTION_ACTIVATED_EVENT data. This ensures the mappping
+     * is done correctly to commons Transaction type as per the original implementation by the
+     * transactions-service.
+     *
+     * @param transactionId The transaction identifier
+     * @param event The MongoDB change stream event document
+     * @return Mono<Transaction> A Transaction object
+     */
+    private fun createTransactionFromActivationEvent(
+        transactionId: String,
+        event: Document,
+    ): Mono<Transaction> {
+        return Mono.fromCallable {
+            val data =
+                event.get("data") as? Document
+                    ?: throw IllegalArgumentException("Missing data in activation event")
+
+            val emailObj = data.get("email") as? Document
+            val emailData =
+                emailObj?.getString("data")
+                    ?: throw IllegalArgumentException("Missing email data in activation event")
+            val email = Confidential<Email>(emailData)
+
+            val paymentNoticesData =
+                data.get("paymentNotices") as? List<*>
+                    ?: throw IllegalArgumentException("Missing paymentNotices in activation event")
+
+            val paymentNotices =
+                paymentNoticesData.map { noticeData ->
+                    val notice = noticeData as Document
+                    val transferList =
+                        (notice.get("transferList") as? List<*>)?.map { transferData ->
+                            val transfer = transferData as Document
+                            PaymentTransferInformation().apply {
+                                paFiscalCode = transfer.getString("paFiscalCode")
+                                digitalStamp = transfer.getBoolean("digitalStamp", false)
+                                transferAmount = transfer.getInteger("transferAmount")
+                                transferCategory = transfer.getString("transferCategory")
+                            }
+                        } ?: emptyList()
+
+                    PaymentNotice(
+                        notice.getString("paymentToken"),
+                        notice.getString("rptId"),
+                        notice.getString("description"),
+                        notice.getInteger("amount"),
+                        null,
+                        transferList,
+                        notice.getBoolean("isAllCCP", false),
+                        notice.getString("companyName"),
+                        notice.getString("creditorReferenceId"),
+                    )
+                }
+
+            val clientIdString =
+                data.getString("clientId")
+                    ?: throw IllegalArgumentException("Missing clientId in activation event")
+            val clientId =
+                Transaction.ClientId.fromString(clientIdString)
+                    ?: throw IllegalArgumentException(
+                        "Invalid clientId in activation event: $clientIdString"
+                    )
+
+            val creationDate =
+                event.getString("creationDate")
+                    ?: throw IllegalArgumentException("Missing creationDate in activation event")
+
+            Transaction(
+                transactionId,
+                paymentNotices,
+                null,
+                email,
+                TransactionStatusDto.ACTIVATED,
+                clientId,
+                creationDate,
+                null,
+                null,
+                null,
+                null,
+                null,
+                ZonedDateTime.parse(creationDate).toInstant().toEpochMilli(), // lastProcessedEventAt
+            )
+        }
     }
 }
