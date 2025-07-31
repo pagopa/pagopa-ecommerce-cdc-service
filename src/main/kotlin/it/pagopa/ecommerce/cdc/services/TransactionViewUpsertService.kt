@@ -101,13 +101,17 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
             "TRANSACTION_USER_RECEIPT_REQUESTED_EVENT" -> updateUserReceiptData(update, event)
             "TRANSACTION_EXPIRED_EVENT" -> updateExpiredData(update, event)
             "TRANSACTION_REFUND_REQUESTED_EVENT" -> updateRefundRequestData(update, event)
-            "TRANSACTION_CANCELED_EVENT" -> updateCanceledData(update, event)
             "TRANSACTION_USER_CANCELED_EVENT" -> updateUserCanceledData(update, event)
             "TRANSACTION_CLOSED_EVENT" -> updateClosedData(update, event)
             "TRANSACTION_REFUND_ERROR_EVENT" -> updateRefundErrorData(update, event)
             "TRANSACTION_CLOSURE_ERROR_EVENT" -> updateClosureErrorData(update, event)
             "TRANSACTION_USER_RECEIPT_ADDED_EVENT" -> updateUserReceiptAddedData(update, event)
             "TRANSACTION_ADD_USER_RECEIPT_ERROR_EVENT" -> updateUserReceiptErrorData(update, event)
+            "TRANSACTION_CLOSURE_RETRIED_EVENT" -> updateClosureRetriedData(update, event)
+            "TRANSACTION_CLOSURE_FAILED_EVENT" -> updateClosureFailedData(update, event)
+            "TRANSACTION_REFUNDED_EVENT" -> updateRefundedData(update, event)
+            "TRANSACTION_REFUND_RETRIED_EVENT" -> updateRefundRetriedData(update, event)
+            "TRANSACTION_ADD_USER_RECEIPT_RETRY_EVENT" -> updateUserReceiptRetryData(update, event)
             else -> {
                 logger.warn("Unknown event code: [{}] for event: [{}]", eventCode, event.toJson())
                 // for unmapped events, just update timestamp and basic fields
@@ -275,19 +279,6 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
         return update
     }
 
-    /** Updates fields for TRANSACTION_CANCELED_EVENT. Adds cancellation information. */
-    private fun updateCanceledData(update: Update, event: Document): Update {
-        val data = event.get("data") as? Document
-
-        data?.let { eventData ->
-            eventData.getString("cancelReason")?.let { update.set("cancelReason", it) }
-
-            event.getString("creationDate")?.let { update.set("canceledAt", it) }
-        }
-
-        return update
-    }
-
     /**
      * Updates fields for TRANSACTION_CLOSED_EVENT. Sets sendPaymentResultOutcome and closure
      * timestamp.
@@ -365,6 +356,79 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
         }
 
         event.getString("creationDate")?.let { update.set("userReceiptErrorAt", it) }
+
+        return update
+    }
+
+    /** Updates fields for TRANSACTION_CLOSURE_RETRIED_EVENT. Adds closure retry information. */
+    private fun updateClosureRetriedData(update: Update, event: Document): Update {
+        val data = event.get("data") as? Document
+
+        data?.let { eventData ->
+            eventData.getInteger("retryCount")?.let { update.set("closureRetryCount", it) }
+            eventData.getString("retryReason")?.let { update.set("closureRetryReason", it) }
+        }
+
+        event.getString("creationDate")?.let { update.set("closureRetriedAt", it) }
+
+        return update
+    }
+
+    /** Updates fields for TRANSACTION_CLOSURE_FAILED_EVENT. Adds closure failure information. */
+    private fun updateClosureFailedData(update: Update, event: Document): Update {
+        val data = event.get("data") as? Document
+
+        data?.let { eventData ->
+            eventData.getString("failureReason")?.let { update.set("closureFailureReason", it) }
+            eventData.getString("errorCode")?.let { update.set("closureErrorCode", it) }
+        }
+
+        event.getString("creationDate")?.let { update.set("closureFailedAt", it) }
+
+        return update
+    }
+
+    /** Updates fields for TRANSACTION_REFUNDED_EVENT. Adds refund completion information. */
+    private fun updateRefundedData(update: Update, event: Document): Update {
+        val data = event.get("data") as? Document
+
+        data?.let { eventData ->
+            eventData.getInteger("refundedAmount")?.let { update.set("refundedAmount", it) }
+            eventData.getString("refundStatus")?.let { update.set("refundStatus", it) }
+            eventData.getString("refundId")?.let { update.set("refundId", it) }
+        }
+
+        event.getString("creationDate")?.let { update.set("refundedAt", it) }
+
+        return update
+    }
+
+    /** Updates fields for TRANSACTION_REFUND_RETRIED_EVENT. Adds refund retry information. */
+    private fun updateRefundRetriedData(update: Update, event: Document): Update {
+        val data = event.get("data") as? Document
+
+        data?.let { eventData ->
+            eventData.getInteger("retryCount")?.let { update.set("refundRetryCount", it) }
+            eventData.getString("retryReason")?.let { update.set("refundRetryReason", it) }
+        }
+
+        event.getString("creationDate")?.let { update.set("refundRetriedAt", it) }
+
+        return update
+    }
+
+    /**
+     * Updates fields for TRANSACTION_ADD_USER_RECEIPT_RETRY_EVENT. Adds receipt retry information.
+     */
+    private fun updateUserReceiptRetryData(update: Update, event: Document): Update {
+        val data = event.get("data") as? Document
+
+        data?.let { eventData ->
+            eventData.getInteger("retryCount")?.let { update.set("receiptRetryCount", it) }
+            eventData.getString("retryReason")?.let { update.set("receiptRetryReason", it) }
+        }
+
+        event.getString("creationDate")?.let { update.set("receiptRetriedAt", it) }
 
         return update
     }
