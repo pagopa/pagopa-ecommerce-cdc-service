@@ -48,43 +48,27 @@ class TransactionViewUpsertService(
                     eventCode,
                 )
 
-                // for ACTIVATE events (first of the payment flow), create Transaction object
-                if (eventCode == "TRANSACTION_ACTIVATED_EVENT") {
-                    createTransactionFromActivationEvent(transactionId, event)
-                        .flatMap { transaction ->
-                            // TODO change to "transactions-view" collection for prod
-                            mongoTemplate.save(transaction, transactionViewName).doOnNext {
-                                logger.debug(
-                                    "Transaction created via mongoTemplate.save() for transactionId: [{}] in $transactionViewName",
-                                    transactionId,
-                                )
-                            }
-                        }
-                        .thenReturn(Unit)
-                } else {
-                    // for other events (after ACTIVATE), use upsert operations
-                    // TODO verify collection targeting for prod deployment
-                    val query = Query.query(Criteria.where("transactionId").`is`(transactionId))
-                    val update = buildUpdateFromEvent(event)
+                // TODO verify collection targeting for prod deployment
+                val query = Query.query(Criteria.where("transactionId").`is`(transactionId))
+                val update = buildUpdateFromEvent(event)
 
-                    (mongoTemplate.upsert(
-                            query,
-                            update,
-                            BaseTransactionView::class.java,
-                            transactionViewName,
-                        ))
-                        .doOnNext { updateResult ->
-                            logger.debug(
-                                "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
-                                transactionId,
-                                eventCode,
-                                updateResult.matchedCount,
-                                updateResult.modifiedCount,
-                                updateResult.upsertedId != null,
-                            )
-                        }
-                        .thenReturn(Unit)
-                }
+                (mongoTemplate.upsert(
+                        query,
+                        update,
+                        BaseTransactionView::class.java,
+                        transactionViewName,
+                    ))
+                    .doOnNext { updateResult ->
+                        logger.debug(
+                            "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
+                            transactionId,
+                            eventCode,
+                            updateResult.matchedCount,
+                            updateResult.modifiedCount,
+                            updateResult.upsertedId != null,
+                        )
+                    }
+                    .thenReturn(Unit)
             }
             .doOnSuccess { _ ->
                 logger.info("Successfully upserted transaction view for _id: [{}]", transactionId)
