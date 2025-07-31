@@ -6,11 +6,10 @@ import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
 import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
+import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
 import java.time.Instant
 import java.time.ZonedDateTime
-import org.bson.BsonDocument
-import org.bson.Document
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.event.ApplicationReadyEvent
@@ -64,8 +63,8 @@ class EcommerceTransactionsLogEventsStream(
      * Creates and starts the MongoDB Change Stream for transaction events. Implements retry logic
      * and error handling based on wallet CDC patterns.
      */
-    fun streamEcommerceTransactionsLogEvents(): Flux<Document> {
-        val flux: Flux<Document> =
+    fun streamEcommerceTransactionsLogEvents(): Flux<TransactionEvent<*>> {
+        val flux: Flux<TransactionEvent<*>> =
             Flux.defer {
                     logger.info(
                         "Connecting to MongoDB Change Stream for collection: ${changeStreamOptionsConfig.collection}"
@@ -85,10 +84,10 @@ class EcommerceTransactionsLogEventsStream(
                                 )
                                 .resumeAt(redisResumePolicyService.getResumeTimestamp())
                                 .build(),
-                            BsonDocument::class.java,
+                            TransactionEvent::class.java,
                         )
                         // Process the elements of the Flux
-                        .flatMap { processEvent(it.raw?.fullDocument) }
+                        .flatMap { processEvent(it.body!!) }
                         // Save resume token every n emitted elements
                         .index { changeEventFluxIndex, changeEventDocument ->
                             Pair(changeEventFluxIndex, changeEventDocument)
@@ -119,11 +118,11 @@ class EcommerceTransactionsLogEventsStream(
      * Processes individual change stream events. Currently delegates to the CDC event dispatcher
      * service for logging.
      */
-    private fun processEvent(event: Document?): Mono<Document> {
+    private fun processEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> {
         return Mono.defer {
-                event?.let { event ->
+                event.let { event ->
                     cdcLockService
-                        .acquireEventLock(event.getString("_id").toString())
+                        .acquireEventLock(event.id)
                         .filter { it == true }
                         .flatMap { ecommerceCDCEventDispatcherService.dispatchEvent(event) }
                 } ?: Mono.empty()
@@ -136,18 +135,17 @@ class EcommerceTransactionsLogEventsStream(
 
     private fun saveCdcResumeToken(
         changeEventFluxIndex: Long,
-        changeEventDocument: Document,
-    ): Mono<Document> {
+        changeEventDocument: TransactionEvent<*>,
+    ): Mono<TransactionEvent<*>> {
         return Mono.defer {
                 if (changeEventFluxIndex.plus(1).mod(saveInterval) == 0) {
-                    val documentTimestamp = changeEventDocument.getString("creationDate")
+                    val documentTimestamp = changeEventDocument.creationDate
                     val resumeTimestamp =
                         if (!documentTimestamp.isNullOrBlank()) {
                             ZonedDateTime.parse(documentTimestamp).toInstant()
                         } else {
                             Instant.now()
                         }
-
                     redisResumePolicyService.saveResumeTimestamp(resumeTimestamp)
                 }
                 Mono.just(changeEventDocument)

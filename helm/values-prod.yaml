@@ -17,7 +17,7 @@ microservice-chart:
     envConfig:
       OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service-blue"
       OTEL_RESOURCE_ATTRIBUTES: "service.name=pagopa-ecommerce-cdc-service-blue,deployment.environment=prod"
-    envSecret: {}
+    envSecret: { }
   image:
     repository: pagopapcommonacr.azurecr.io/pagopaecommercecdcservice
     tag: "0.1.0"
@@ -50,9 +50,9 @@ microservice-chart:
     servicePort: 8080
   serviceAccount:
     create: false
-    annotations: {}
+    annotations: { }
     name: "ecommerce-workload-identity"
-  podAnnotations: {}
+  podAnnotations: { }
   podSecurityContext:
     seccompProfile:
       type: RuntimeDefault
@@ -131,6 +131,7 @@ microservice-chart:
     CDC_REDIS_RESUME_FALLBACK_IN_MIN: "60"
     CDC_REDIS_RESUME_TTL_IN_MIN: "4320" #3 days
     CDC_RESUME_SAVE_INTERVAL: "5"
+    ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME: "transaction-view"
   envSecret:
     OTEL_EXPORTER_OTLP_HEADERS: elastic-otel-token-header
     MONGO_PASSWORD: mongo-ecommerce-password
@@ -139,8 +140,8 @@ microservice-chart:
   keyvault:
     name: "pagopa-p-ecommerce-kv"
     tenantId: "7788edaf-0346-4068-9d79-c868aed15b3d"
-  nodeSelector: {}
-  tolerations: []
+  nodeSelector: { }
+  tolerations: [ ]
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
