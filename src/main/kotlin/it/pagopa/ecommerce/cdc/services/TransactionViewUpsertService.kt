@@ -1,6 +1,6 @@
 package it.pagopa.ecommerce.cdc.services
 
-import it.pagopa.ecommerce.cdc.documents.BaseTransactionView
+import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import it.pagopa.ecommerce.commons.documents.PaymentNotice
 import it.pagopa.ecommerce.commons.documents.PaymentTransferInformation
 import it.pagopa.ecommerce.commons.documents.v2.Transaction
@@ -10,6 +10,7 @@ import it.pagopa.ecommerce.commons.generated.server.model.TransactionStatusDto
 import java.time.ZonedDateTime
 import org.bson.Document
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
@@ -20,13 +21,12 @@ import reactor.core.publisher.Mono
 /**
  * Service for performing upsert operations on transaction views with efficient atomic upsert
  * operations using native MongoDB queries.
- *
- * TODO PRODUCTION - Currently writes to "cdc-transactions-view" clone collection for DEV/UAT
- * testing. For production deployment, change ACTIVATION events to write to "transactions-view"
- * collection to replace the existing transactions-service view updates.
  */
 @Service
-class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTemplate) {
+class TransactionViewUpsertService(
+    private val mongoTemplate: ReactiveMongoTemplate,
+    @Value($$"${ecommerce.transactionView.collection.name}") private val transactionViewName: String,
+) {
 
     private val logger = LoggerFactory.getLogger(TransactionViewUpsertService::class.java)
 
@@ -38,8 +38,8 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
      * @param event The MongoDB change stream event document
      * @return Mono<Void> Completes when the upsert operation succeeds
      */
-    fun upsertEventData(transactionId: String, event: Document): Mono<Void> {
-        return Mono.defer<Void> {
+    fun upsertEventData(transactionId: String, event: Document): Mono<Unit> {
+        return Mono.defer {
                 val eventCode = event.getString("eventCode") ?: "UNKNOWN"
 
                 logger.debug(
@@ -53,22 +53,26 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
                     createTransactionFromActivationEvent(transactionId, event)
                         .flatMap { transaction ->
                             // TODO change to "transactions-view" collection for prod
-                            mongoTemplate.save(transaction, "cdc-transactions-view").doOnNext {
-                                savedTransaction ->
+                            mongoTemplate.save(transaction, transactionViewName).doOnNext {
                                 logger.debug(
-                                    "Transaction created via mongoTemplate.save() for transactionId: [{}] in cdc-transactions-view",
+                                    "Transaction created via mongoTemplate.save() for transactionId: [{}] in $transactionViewName",
                                     transactionId,
                                 )
                             }
                         }
-                        .then()
+                        .thenReturn(Unit)
                 } else {
                     // for other events (after ACTIVATE), use upsert operations
                     // TODO verify collection targeting for prod deployment
                     val query = Query.query(Criteria.where("transactionId").`is`(transactionId))
                     val update = buildUpdateFromEvent(event)
 
-                    (mongoTemplate.upsert(query, update, BaseTransactionView::class.java))
+                    (mongoTemplate.upsert(
+                            query,
+                            update,
+                            BaseTransactionView::class.java,
+                            transactionViewName,
+                        ))
                         .doOnNext { updateResult ->
                             logger.debug(
                                 "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
@@ -79,7 +83,7 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
                                 updateResult.upsertedId != null,
                             )
                         }
-                        .then()
+                        .thenReturn(Unit)
                 }
             }
             .doOnSuccess { _ ->
