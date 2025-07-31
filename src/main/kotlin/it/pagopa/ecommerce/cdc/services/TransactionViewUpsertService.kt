@@ -45,13 +45,15 @@ class TransactionViewUpsertService(
 
             val query = Query.query(Criteria.where("transactionId").`is`(transactionId))
             val update = buildUpdateFromEvent(event)
-
-            (mongoTemplate.upsert(
-                query,
-                update,
-                BaseTransactionView::class.java,
-                transactionViewName,
-            ))
+            Mono.justOrEmpty(update)
+                .flatMap { updateDefinition ->
+                    mongoTemplate.upsert(
+                        query,
+                        updateDefinition!!,
+                        BaseTransactionView::class.java,
+                        transactionViewName,
+                    )
+                }
                 .doOnNext { updateResult ->
                     logger.debug(
                         "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
@@ -83,32 +85,36 @@ class TransactionViewUpsertService(
      * @param event The MongoDB change stream event document
      * @return Update object with field updates based on event type
      */
-    private fun buildUpdateFromEvent(event: TransactionEvent<*>): Update {
+    private fun buildUpdateFromEvent(event: TransactionEvent<*>): Update? {
         val update = Update()
         val eventCode = event.eventCode
-
         // apply updates based on specific event types
         when (event) {
             is TransactionActivatedEvent -> updateActivationData(update, event)
             is TransactionAuthorizationRequestedEvent -> updateAuthRequestData(update, event)
             is TransactionAuthorizationCompletedEvent -> updateAuthCompletedData(update, event)
-            is TransactionClosureRequestedEvent -> updateClosureRequestData(update, event)
             is TransactionUserReceiptRequestedEvent -> updateUserReceiptData(update, event)
-            is TransactionExpiredEvent -> updateExpiredData(update, event)
-            is TransactionRefundRequestedEvent -> updateRefundRequestData(update, event)
-            is TransactionUserCanceledEvent -> updateUserCanceledData(update, event)
             is TransactionClosedEvent -> updateClosedData(update, event)
-            is TransactionRefundErrorEvent -> updateRefundErrorData(update, event)
             is TransactionClosureErrorEvent -> updateClosureErrorData(update, event)
-            is TransactionUserReceiptAddedEvent -> updateUserReceiptAddedData(update, event)
-            is TransactionUserReceiptAddErrorEvent -> updateUserReceiptErrorData(update, event)
             is TransactionClosureRetriedEvent -> updateClosureRetriedData(update, event)
-            is TransactionClosureFailedEvent -> updateClosureFailedData(update, event)
-            is TransactionRefundedEvent -> updateRefundedData(update, event)
-            is TransactionRefundRetriedEvent -> updateRefundRetriedData(update, event)
-            is TransactionUserReceiptAddRetriedEvent -> updateUserReceiptRetryData(update, event)
+            is TransactionExpiredEvent,
+            is TransactionRefundRequestedEvent,
+            is TransactionUserCanceledEvent,
+            is TransactionClosureRequestedEvent,
+            is TransactionRefundErrorEvent,
+            is TransactionUserReceiptAddedEvent,
+            is TransactionUserReceiptAddErrorEvent,
+            is TransactionClosureFailedEvent,
+            is TransactionRefundedEvent,
+            is TransactionRefundRetriedEvent,
+            is TransactionUserReceiptAddRetriedEvent -> return null
+
             else -> {
-                logger.warn("Unhandled event with code: [{}]. Event class: [{}]", eventCode, event.javaClass)
+                logger.warn(
+                    "Unhandled event with code: [{}]. Event class: [{}]",
+                    eventCode,
+                    event.javaClass,
+                )
             }
         }
 
@@ -121,15 +127,11 @@ class TransactionViewUpsertService(
      */
     private fun updateActivationData(update: Update, event: TransactionActivatedEvent): Update {
         val data = event.data
-
         update["email"] = data.email.opaqueData
-
         update["paymentNotices"] = data.paymentNotices
-
         update["clientId"] = data.clientId
-
         update["creationDate"] = event.creationDate
-
+        update["_class"] = Transaction::class.java.canonicalName
         return update
     }
 
@@ -137,7 +139,10 @@ class TransactionViewUpsertService(
      * Updates fields for TRANSACTION_AUTHORIZATION_REQUESTED_EVENT. Adds payment gateway
      * information and authorization details.
      */
-    private fun updateAuthRequestData(update: Update, event: TransactionAuthorizationRequestedEvent): Update {
+    private fun updateAuthRequestData(
+        update: Update,
+        event: TransactionAuthorizationRequestedEvent,
+    ): Update {
         val authorizationRequestedData = event.data
         update["paymentGateway"] = authorizationRequestedData.paymentGateway
         update["paymentTypeCode"] = authorizationRequestedData.paymentTypeCode
@@ -150,7 +155,10 @@ class TransactionViewUpsertService(
      * Updates fields for TRANSACTION_AUTHORIZATION_COMPLETED_EVENT. Adds authorization results and
      * gateway response information.
      */
-    private fun updateAuthCompletedData(update: Update, event: TransactionAuthorizationCompletedEvent): Update {
+    private fun updateAuthCompletedData(
+        update: Update,
+        event: TransactionAuthorizationCompletedEvent,
+    ): Update {
         val data = event.data
 
         update["rrn"] = data.rrn
@@ -169,7 +177,11 @@ class TransactionViewUpsertService(
                 update["authorizationErrorCode"] = gatewayAuthData.errorCode
             }
 
-            else -> logger.warn("Unhandled transaction gateway authorization data: [{}]", gatewayAuthData::class.java)
+            else ->
+                logger.warn(
+                    "Unhandled transaction gateway authorization data: [{}]",
+                    gatewayAuthData::class.java,
+                )
         }
 
         return update
@@ -179,29 +191,37 @@ class TransactionViewUpsertService(
      * Updates fields for TRANSACTION_CLOSURE_REQUESTED_EVENT. Adds closure information and outcome
      * details.
      */
-    private fun updateClosureRequestData(update: Update, event: TransactionClosureRequestedEvent): Update {
-        //no view field to be updated
+    private fun updateClosureRequestData(
+        update: Update,
+        event: TransactionClosureRequestedEvent,
+    ): Update {
+        // no view field to be updated
         return update
     }
 
     /**
      * Updates fields for TRANSACTION_USER_RECEIPT_REQUESTED_EVENT. Adds user receipt information.
      */
-    private fun updateUserReceiptData(update: Update, event: TransactionUserReceiptRequestedEvent): Update {
+    private fun updateUserReceiptData(
+        update: Update,
+        event: TransactionUserReceiptRequestedEvent,
+    ): Update {
         update["sendPaymentResultOutcome"] = event.data.responseOutcome
         return update
     }
 
-
     /** Updates fields for TRANSACTION_EXPIRED_EVENT. Adds expiration information. */
     private fun updateExpiredData(update: Update, event: TransactionExpiredEvent): Update {
-        //no view field to be updated
+        // no view field to be updated
         return update
     }
 
     /** Updates fields for TRANSACTION_REFUND_REQUESTED_EVENT. Adds refund request information. */
-    private fun updateRefundRequestData(update: Update, event: TransactionRefundRequestedEvent): Update {
-        //no view field to be updated
+    private fun updateRefundRequestData(
+        update: Update,
+        event: TransactionRefundRequestedEvent,
+    ): Update {
+        // no view field to be updated
         return update
     }
 
@@ -218,39 +238,54 @@ class TransactionViewUpsertService(
     }
 
     /** Updates fields for TRANSACTION_USER_CANCELED_EVENT. Adds cancellation timestamp. */
-    private fun updateUserCanceledData(update: Update, event: TransactionUserCanceledEvent): Update {
-        //no view field to be updated
+    private fun updateUserCanceledData(
+        update: Update,
+        event: TransactionUserCanceledEvent,
+    ): Update {
+        // no view field to be updated
         return update
     }
 
     /** Updates fields for TRANSACTION_REFUND_ERROR_EVENT. Adds refund error information. */
     private fun updateRefundErrorData(update: Update, event: TransactionRefundErrorEvent): Update {
-        //no view field to be updated
+        // no view field to be updated
         return update
     }
 
     /** Updates fields for TRANSACTION_CLOSURE_ERROR_EVENT. Adds closure error timestamp. */
-    private fun updateClosureErrorData(update: Update, event: TransactionClosureErrorEvent): Update {
+    private fun updateClosureErrorData(
+        update: Update,
+        event: TransactionClosureErrorEvent,
+    ): Update {
         update["closureErrorData"] = event.data
         return update
     }
 
     /** Updates fields for TRANSACTION_USER_RECEIPT_ADDED_EVENT. Sets notification outcome. */
-    private fun updateUserReceiptAddedData(update: Update, event: TransactionUserReceiptAddedEvent): Update {
-        //no view field to be updated
+    private fun updateUserReceiptAddedData(
+        update: Update,
+        event: TransactionUserReceiptAddedEvent,
+    ): Update {
+        // no view field to be updated
         return update
     }
 
     /**
      * Updates fields for TRANSACTION_ADD_USER_RECEIPT_ERROR_EVENT. Adds receipt error information.
      */
-    private fun updateUserReceiptErrorData(update: Update, event: TransactionUserReceiptAddErrorEvent): Update {
-        //no view field to be updated
+    private fun updateUserReceiptErrorData(
+        update: Update,
+        event: TransactionUserReceiptAddErrorEvent,
+    ): Update {
+        // no view field to be updated
         return update
     }
 
     /** Updates fields for TRANSACTION_CLOSURE_RETRIED_EVENT. Adds closure retry information. */
-    private fun updateClosureRetriedData(update: Update, event: TransactionClosureRetriedEvent): Update {
+    private fun updateClosureRetriedData(
+        update: Update,
+        event: TransactionClosureRetriedEvent,
+    ): Update {
         update["sendPaymentResultOutcome"] = TransactionUserReceiptData.Outcome.NOT_RECEIVED
         if (event.data.closureErrorData != null) {
             update["closureErrorData"] = event.data.closureErrorData
@@ -259,29 +294,37 @@ class TransactionViewUpsertService(
     }
 
     /** Updates fields for TRANSACTION_CLOSURE_FAILED_EVENT. Adds closure failure information. */
-    private fun updateClosureFailedData(update: Update, event: TransactionClosureFailedEvent): Update {
-        //no view field to be updated
+    private fun updateClosureFailedData(
+        update: Update,
+        event: TransactionClosureFailedEvent,
+    ): Update {
+        // no view field to be updated
         return update
     }
 
     /** Updates fields for TRANSACTION_REFUNDED_EVENT. Adds refund completion information. */
     private fun updateRefundedData(update: Update, event: TransactionRefundedEvent): Update {
-        //no view field to be updated
+        // no view field to be updated
         return update
     }
 
     /** Updates fields for TRANSACTION_REFUND_RETRIED_EVENT. Adds refund retry information. */
-    private fun updateRefundRetriedData(update: Update, event: TransactionRefundRetriedEvent): Update {
-        //no view field to be updated
+    private fun updateRefundRetriedData(
+        update: Update,
+        event: TransactionRefundRetriedEvent,
+    ): Update {
+        // no view field to be updated
         return update
     }
 
     /**
      * Updates fields for TRANSACTION_ADD_USER_RECEIPT_RETRY_EVENT. Adds receipt retry information.
      */
-    private fun updateUserReceiptRetryData(update: Update, event: TransactionUserReceiptAddRetriedEvent): Update {
-        //no view field to be updated
+    private fun updateUserReceiptRetryData(
+        update: Update,
+        event: TransactionUserReceiptAddRetriedEvent,
+    ): Update {
+        // no view field to be updated
         return update
     }
-
 }

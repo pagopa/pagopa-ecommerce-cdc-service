@@ -2,12 +2,12 @@ package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
+import java.time.Duration
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Mono
 import reactor.util.retry.Retry
-import java.time.Duration
 
 /**
  * Service responsible for dispatching and processing transaction status change events.
@@ -32,25 +32,25 @@ class EcommerceCDCEventDispatcherService(
      */
     fun dispatchEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> =
         Mono.defer {
-            // extract document fields
-            val transactionId = event.transactionId
-            val eventClass = event.javaClass
-            val creationDate = event.creationDate
+                // extract document fields
+                val transactionId = event.transactionId
+                val eventClass = event.javaClass
+                val creationDate = event.creationDate
 
-            logger.info(
-                "Handling new change stream event: transactionId: [{}], eventType: [{}], creationDate: [{}]",
-                transactionId,
-                eventClass,
-                creationDate,
-            )
+                logger.info(
+                    "Handling new change stream event: transactionId: [{}], eventType: [{}], creationDate: [{}]",
+                    transactionId,
+                    eventClass,
+                    creationDate,
+                )
 
-            processTransactionEvent(event)
-        }
+                processTransactionEvent(event)
+            }
             .retryWhen(
                 Retry.fixedDelay(
-                    retrySendPolicyConfig.maxAttempts,
-                    Duration.ofMillis(retrySendPolicyConfig.intervalInMs),
-                )
+                        retrySendPolicyConfig.maxAttempts,
+                        Duration.ofMillis(retrySendPolicyConfig.intervalInMs),
+                    )
                     .filter { t -> t is Exception }
                     .doBeforeRetry { signal ->
                         logger.warn(
@@ -74,7 +74,6 @@ class EcommerceCDCEventDispatcherService(
         val transactionId = event.transactionId
         val eventCode = event.eventCode
         val creationDate = event.creationDate
-
 
         logger.info(
             "CDC Event Details: transactionId: [{}], eventId: [{}], eventCode: [{}], creationDate: [{}]",
