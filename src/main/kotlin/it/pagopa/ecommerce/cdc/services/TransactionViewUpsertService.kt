@@ -1,6 +1,5 @@
 package it.pagopa.ecommerce.cdc.services
 
-import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import java.time.ZonedDateTime
 import org.bson.Document
 import org.slf4j.LoggerFactory
@@ -21,13 +20,14 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
     private val logger = LoggerFactory.getLogger(TransactionViewUpsertService::class.java)
 
     /**
-     * Performs an upsert operation for transaction view data based on the event content.
+     * Performs an upsert operation for transaction view data based on the event content. Uses a
+     * single atomic upsert operation without additional database reads for optimal performance.
      *
      * @param transactionId The transaction identifier
      * @param event The MongoDB change stream event document
-     * @return Mono<BaseTransactionView> The upserted transaction view document
+     * @return Mono<Void> Completes when the upsert operation succeeds
      */
-    fun upsertEventData(transactionId: String, event: Document): Mono<BaseTransactionView> {
+    fun upsertEventData(transactionId: String, event: Document): Mono<Void> {
         return Mono.defer {
                 val eventCode = event.getString("eventCode") ?: "UNKNOWN"
                 //                val creationDate = event.getString("creationDate")
@@ -43,13 +43,17 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
 
                 mongoTemplate
                     .upsert(query, update, "cdc-transactions-view")
-                    .then(
-                        mongoTemplate.findOne(
-                            query,
-                            BaseTransactionView::class.java,
-                            "cdc-transactions-view",
+                    .doOnNext { updateResult ->
+                        logger.debug(
+                            "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
+                            transactionId,
+                            eventCode,
+                            updateResult.matchedCount,
+                            updateResult.modifiedCount,
+                            updateResult.upsertedId != null,
                         )
-                    )
+                    }
+                    .then()
             }
             .doOnSuccess { result ->
                 logger.info(

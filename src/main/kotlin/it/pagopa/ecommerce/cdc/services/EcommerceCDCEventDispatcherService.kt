@@ -94,7 +94,7 @@ class EcommerceCDCEventDispatcherService(
         return if (transactionId != null && transactionId != "unknown") {
             transactionViewUpsertService
                 .upsertEventData(transactionId, event)
-                .doOnSuccess { transactionView ->
+                .doOnSuccess {
                     logger.debug(
                         "Successfully upserted transaction view for eventId: [{}], transactionId: [{}]",
                         eventId,
