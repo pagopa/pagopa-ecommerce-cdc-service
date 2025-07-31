@@ -1,6 +1,7 @@
 package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.documents.BaseTransactionView
+import kotlinx.coroutines.reactor.mono
 import java.time.ZonedDateTime
 import org.bson.Document
 import org.slf4j.LoggerFactory
@@ -38,10 +39,20 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
                     eventCode,
                 )
 
-                val query = Query.query(Criteria.where("transactionId").`is`(transactionId))
-                val update = buildUpdateFromEvent(event)
+                val queryByTransactionId = Query.query(Criteria.where("transactionId").`is`(transactionId))
 
-                (mongoTemplate.upsert(query, update, BaseTransactionView::class.java))
+                val queryByTransactionAndLastProcessedEventAtCondition = Query.query(
+                Criteria.where("transactionId").`is`(transactionId))
+                .addCriteria(
+                    Criteria.where("lastProcessedEventAt").exists(false)
+                        .orOperator(Criteria.where("lastProcessedEventAt").lt(event.getDate("creationDate").toInstant())))
+
+
+                buildUpdateFromEvent(event).flatMap { (update, updateWithStatus) ->
+
+                (mongoTemplate.upsert(queryByTransactionAndLastProcessedEventAtCondition, updateWithStatus, BaseTransactionView::class.java))
+                    .filter { it ->  it.matchedCount > 0}
+                    .switchIfEmpty(mongoTemplate.upsert(queryByTransactionId, update, BaseTransactionView::class.java))
                     .doOnNext { updateResult ->
                         logger.debug(
                             "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
@@ -53,7 +64,7 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
                         )
                     }
                     .then()
-            }
+            }}
             .doOnSuccess {
                 logger.info("Successfully upserted transaction view for _id: [{}]", transactionId)
             }
@@ -73,7 +84,7 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
      * @param event The MongoDB change stream event document
      * @return Update object with field updates based on event type
      */
-    private fun buildUpdateFromEvent(event: Document): Update {
+    private fun buildUpdateFromEvent(event: Document): Mono<Pair<Update, Update>> {
         val update = Update()
         val eventCode = event.getString("eventCode") ?: "UNKNOWN"
         val creationDate = event.getString("creationDate")
@@ -85,29 +96,6 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
                 ZonedDateTime.parse(creationDate).toInstant().toEpochMilli(),
             )
         }
-
-        // TODO CHK-4353: Status updates with conditional timestamp logic
-
-        // set transaction status based on event type
-        val transactionStatus =
-            when (eventCode) {
-                "TRANSACTION_ACTIVATED_EVENT" -> "ACTIVATED"
-                "TRANSACTION_AUTHORIZATION_REQUESTED_EVENT" -> "AUTHORIZATION_REQUESTED"
-                "TRANSACTION_AUTHORIZATION_COMPLETED_EVENT" -> "AUTHORIZATION_COMPLETED"
-                "TRANSACTION_CLOSURE_REQUESTED_EVENT" -> "CLOSURE_REQUESTED"
-                "TRANSACTION_CLOSED_EVENT" -> "CLOSED"
-                "TRANSACTION_EXPIRED_EVENT" -> "EXPIRED"
-                "TRANSACTION_USER_CANCELED_EVENT" -> "CANCELLATION_REQUESTED"
-                "TRANSACTION_REFUND_REQUESTED_EVENT" -> "REFUND_REQUESTED"
-                "TRANSACTION_REFUND_ERROR_EVENT" -> "REFUND_ERROR"
-                "TRANSACTION_CLOSURE_ERROR_EVENT" -> "CLOSURE_ERROR"
-                "TRANSACTION_USER_RECEIPT_REQUESTED_EVENT" -> "NOTIFICATION_REQUESTED"
-                "TRANSACTION_USER_RECEIPT_ADDED_EVENT" -> "NOTIFIED_OK"
-                "TRANSACTION_ADD_USER_RECEIPT_ERROR_EVENT" -> "NOTIFICATION_ERROR"
-                // TODO check if we need more
-                else -> null // keep status for unmapped events
-            }
-        transactionStatus?.let { update.set("status", it) }
 
         // apply updates based on specific event types
         when (eventCode) {
@@ -136,7 +124,7 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
             }
         }
 
-        return update
+        return mono { Pair(update, evaluateStatus(update, eventCode)) }
     }
 
     /**
@@ -444,6 +432,31 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
         // save the entire event data for unmapped events
         data?.let { update.set("lastEventData", it) }
 
+        return update
+    }
+
+    private fun evaluateStatus(update: Update, eventCode: String): Update{
+        // TODO CHK-4353: Status updates with conditional timestamp logic
+        // set transaction status based on event type
+        val transactionStatus =
+            when (eventCode) {
+                "TRANSACTION_ACTIVATED_EVENT" -> "ACTIVATED"
+                "TRANSACTION_AUTHORIZATION_REQUESTED_EVENT" -> "AUTHORIZATION_REQUESTED"
+                "TRANSACTION_AUTHORIZATION_COMPLETED_EVENT" -> "AUTHORIZATION_COMPLETED"
+                "TRANSACTION_CLOSURE_REQUESTED_EVENT" -> "CLOSURE_REQUESTED"
+                "TRANSACTION_CLOSED_EVENT" -> "CLOSED"
+                "TRANSACTION_EXPIRED_EVENT" -> "EXPIRED"
+                "TRANSACTION_USER_CANCELED_EVENT" -> "CANCELLATION_REQUESTED"
+                "TRANSACTION_REFUND_REQUESTED_EVENT" -> "REFUND_REQUESTED"
+                "TRANSACTION_REFUND_ERROR_EVENT" -> "REFUND_ERROR"
+                "TRANSACTION_CLOSURE_ERROR_EVENT" -> "CLOSURE_ERROR"
+                "TRANSACTION_USER_RECEIPT_REQUESTED_EVENT" -> "NOTIFICATION_REQUESTED"
+                "TRANSACTION_USER_RECEIPT_ADDED_EVENT" -> "NOTIFIED_OK"
+                "TRANSACTION_ADD_USER_RECEIPT_ERROR_EVENT" -> "NOTIFICATION_ERROR"
+                // TODO check if we need more
+                else -> null // keep status for unmapped events
+            }
+        transactionStatus?.let { update.set("status", it) }
         return update
     }
 }
