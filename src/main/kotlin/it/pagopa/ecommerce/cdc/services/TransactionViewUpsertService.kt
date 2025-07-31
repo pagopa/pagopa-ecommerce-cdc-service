@@ -1,5 +1,6 @@
 package it.pagopa.ecommerce.cdc.services
 
+import it.pagopa.ecommerce.cdc.documents.BaseTransactionView
 import java.time.ZonedDateTime
 import org.bson.Document
 import org.slf4j.LoggerFactory
@@ -30,10 +31,9 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
     fun upsertEventData(transactionId: String, event: Document): Mono<Void> {
         return Mono.defer {
                 val eventCode = event.getString("eventCode") ?: "UNKNOWN"
-                //                val creationDate = event.getString("creationDate")
 
                 logger.debug(
-                    "Upserting transaction view data for transactionId: [{}], eventCode: [{}]",
+                    "Upserting transaction view data for _id: [{}], eventCode: [{}]",
                     transactionId,
                     eventCode,
                 )
@@ -41,8 +41,7 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
                 val query = Query.query(Criteria.where("transactionId").`is`(transactionId))
                 val update = buildUpdateFromEvent(event)
 
-                mongoTemplate
-                    .upsert(query, update, "cdc-transactions-view")
+                (mongoTemplate.upsert(query, update, BaseTransactionView::class.java))
                     .doOnNext { updateResult ->
                         logger.debug(
                             "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
@@ -55,15 +54,12 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
                     }
                     .then()
             }
-            .doOnSuccess { result ->
-                logger.info(
-                    "Successfully upserted transaction view for transactionId: [{}]",
-                    transactionId,
-                )
+            .doOnSuccess {
+                logger.info("Successfully upserted transaction view for _id: [{}]", transactionId)
             }
             .doOnError { error ->
                 logger.error(
-                    "Failed to upsert transaction view for transactionId: [{}]",
+                    "Failed to upsert transaction view for _id: [{}]",
                     transactionId,
                     error,
                 )
@@ -91,6 +87,27 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
         }
 
         // TODO CHK-4353: Status updates with conditional timestamp logic
+
+        // set transaction status based on event type
+        val transactionStatus =
+            when (eventCode) {
+                "TRANSACTION_ACTIVATED_EVENT" -> "ACTIVATED"
+                "TRANSACTION_AUTHORIZATION_REQUESTED_EVENT" -> "AUTHORIZATION_REQUESTED"
+                "TRANSACTION_AUTHORIZATION_COMPLETED_EVENT" -> "AUTHORIZATION_COMPLETED"
+                "TRANSACTION_CLOSURE_REQUESTED_EVENT" -> "CLOSURE_REQUESTED"
+                "TRANSACTION_CLOSED_EVENT" -> "CLOSED"
+                "TRANSACTION_EXPIRED_EVENT" -> "EXPIRED"
+                "TRANSACTION_USER_CANCELED_EVENT" -> "CANCELLATION_REQUESTED"
+                "TRANSACTION_REFUND_REQUESTED_EVENT" -> "REFUND_REQUESTED"
+                "TRANSACTION_REFUND_ERROR_EVENT" -> "REFUND_ERROR"
+                "TRANSACTION_CLOSURE_ERROR_EVENT" -> "CLOSURE_ERROR"
+                "TRANSACTION_USER_RECEIPT_REQUESTED_EVENT" -> "NOTIFICATION_REQUESTED"
+                "TRANSACTION_USER_RECEIPT_ADDED_EVENT" -> "NOTIFIED_OK"
+                "TRANSACTION_ADD_USER_RECEIPT_ERROR_EVENT" -> "NOTIFICATION_ERROR"
+                // TODO check if we need more
+                else -> null // keep status for unmapped events
+            }
+        transactionStatus?.let { update.set("status", it) }
 
         // apply updates based on specific event types
         when (eventCode) {
@@ -138,21 +155,8 @@ class TransactionViewUpsertService(private val mongoTemplate: ReactiveMongoTempl
 
             eventData.getString("clientId")?.let { update.set("clientId", it) }
             eventData.getString("paymentToken")?.let { update.set("paymentToken", it) }
-            eventData.getInteger("paymentTokenValiditySeconds")?.let {
-                update.set("paymentTokenValiditySeconds", it)
-            }
 
             event.getString("creationDate")?.let { update.set("creationDate", it) }
-
-            event.getString("transactionId")?.let { update.set("transactionId", it) }
-
-            update.set("_class", "it.pagopa.ecommerce.commons.documents.v2.Transaction")
-
-            val paymentNotices = eventData.get("paymentNotices") as? List<*>
-            if (!paymentNotices.isNullOrEmpty()) {
-                val firstNotice = paymentNotices[0] as? Document
-                firstNotice?.getInteger("amount")?.let { update.set("amount", it) }
-            }
         }
 
         return update
