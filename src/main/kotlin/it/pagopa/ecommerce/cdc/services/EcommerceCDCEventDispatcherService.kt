@@ -1,13 +1,13 @@
 package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
-import java.time.Duration
-import org.bson.Document
+import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Mono
 import reactor.util.retry.Retry
+import java.time.Duration
 
 /**
  * Service responsible for dispatching and processing transaction status change events.
@@ -30,27 +30,27 @@ class EcommerceCDCEventDispatcherService(
      * @param event The MongoDB change stream document containing eventstore data
      * @return Mono<Document> The processed document
      */
-    fun dispatchEvent(event: Document): Mono<Document> =
+    fun dispatchEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> =
         Mono.defer {
-                // extract document fields
-                val transactionId = event.getString("transactionId") ?: "unknown"
-                val eventClass = event.getString("_class") ?: "unknown"
-                val creationDate = event.getString("creationDate") ?: "unknown"
+            // extract document fields
+            val transactionId = event.transactionId
+            val eventClass = event.javaClass
+            val creationDate = event.creationDate
 
-                logger.info(
-                    "Handling new change stream event: transactionId: [{}], eventType: [{}], creationDate: [{}]",
-                    transactionId,
-                    eventClass,
-                    creationDate,
-                )
+            logger.info(
+                "Handling new change stream event: transactionId: [{}], eventType: [{}], creationDate: [{}]",
+                transactionId,
+                eventClass,
+                creationDate,
+            )
 
-                processTransactionEvent(event)
-            }
+            processTransactionEvent(event)
+        }
             .retryWhen(
                 Retry.fixedDelay(
-                        retrySendPolicyConfig.maxAttempts,
-                        Duration.ofMillis(retrySendPolicyConfig.intervalInMs),
-                    )
+                    retrySendPolicyConfig.maxAttempts,
+                    Duration.ofMillis(retrySendPolicyConfig.intervalInMs),
+                )
                     .filter { t -> t is Exception }
                     .doBeforeRetry { signal ->
                         logger.warn(
@@ -69,54 +69,39 @@ class EcommerceCDCEventDispatcherService(
      * @param event The transaction change document
      * @return Mono<Document> The processed document
      */
-    private fun processTransactionEvent(event: Document): Mono<Document> {
-        val eventId = event.getString("_id")
-        val transactionId = event.getString("transactionId")
-        val eventCode = event.getString("eventCode")
-        val creationDate = event.getString("creationDate")
+    private fun processTransactionEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> {
+        val eventId = event.id
+        val transactionId = event.transactionId
+        val eventCode = event.eventCode
+        val creationDate = event.creationDate
 
-        // extract data from nested 'data' field if present
-        val data = event.get("data") as? Document
-        val paymentNotices = data?.get("paymentNotices") as? List<*>
-        val clientId = data?.getString("clientId")
 
         logger.info(
-            "CDC Event Details: transactionId: [{}], eventId: [{}], eventCode: [{}], creationDate: [{}], clientId: [{}], paymentNotices: [{}]",
+            "CDC Event Details: transactionId: [{}], eventId: [{}], eventCode: [{}], creationDate: [{}]",
             transactionId,
             eventId,
             eventCode,
             creationDate,
-            clientId,
-            paymentNotices?.size ?: 0,
         )
 
         // upsert operation if the transactionId is valid
-        return if (transactionId != null && transactionId != "unknown") {
-            transactionViewUpsertService
-                .upsertEventData(transactionId, event)
-                .doOnSuccess {
-                    logger.debug(
-                        "Successfully upserted transaction view for eventId: [{}], transactionId: [{}]",
-                        eventId,
-                        transactionId,
-                    )
-                }
-                .doOnError { error ->
-                    logger.error(
-                        "Failed to upsert transaction view for eventId: [{}], transactionId: [{}]",
-                        eventId,
-                        transactionId,
-                        error,
-                    )
-                }
-                .then(Mono.just(event))
-        } else {
-            logger.warn(
-                "Skipping upsert for event with invalid transactionId: [{}], eventId: [{}]",
-                transactionId,
-                eventId,
-            )
-            Mono.just(event)
-        }
+        return transactionViewUpsertService
+            .upsertEventData(transactionId, event)
+            .doOnSuccess {
+                logger.debug(
+                    "Successfully upserted transaction view for eventId: [{}], transactionId: [{}]",
+                    eventId,
+                    transactionId,
+                )
+            }
+            .doOnError { error ->
+                logger.error(
+                    "Failed to upsert transaction view for eventId: [{}], transactionId: [{}]",
+                    eventId,
+                    transactionId,
+                    error,
+                )
+            }
+            .then(Mono.just(event))
     }
 }
