@@ -1,5 +1,8 @@
 # pagopa-ecommerce-cdc-service
-This repository is designed to manage and process events related to changes in ecommerce transactions event within the PagoPA ecommerce ecosystem. This service listens to events that signal changes (such as event creation) and ensures that these updates are appropriately handled in a (near) real-time manner.
+
+This repository is designed to manage and process events related to changes in ecommerce transactions event within the
+PagoPA ecommerce ecosystem. This service listens to events that signal changes (such as event creation) and ensures that
+these updates are appropriately handled in a (near) real-time manner.
 
 - [pagopa-ecommerce-cdc-service](#pagopa-ecommerce-cdc-service)
     * [Technology Stack](#technology-stack)
@@ -39,59 +42,63 @@ to get a good default configuration.
 
 If you want to customize the application environment, reference this table:
 
-| Variable name                     | Description                                                                                                                                                | type              | default |
-|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|---------|
-| ROOT_LOGGING_LEVEL                | Application root logger level                                                                                                                              | string            | INFO    |
-| APP_LOGGING_LEVEL                 | it.pagopa logger level                                                                                                                                     | string            | INFO    |
-| WEB_LOGGING_LEVEL                 | Web logger level                                                                                                                                           | string            | INFO    |
-| MONGO_HOST                        | Host where MongoDB instance used to persist transaction data                                                                                               | hostname (string) |         |
-| MONGO_PORT                        | Port where MongoDB is bound to in MongoDB host                                                                                                             | number            |         |
-| MONGO_USERNAME                    | MongoDB username used to connect to the database                                                                                                           | string            |         |
-| MONGO_PASSWORD                    | MongoDB password used to connect to the database                                                                                                           | string            |         |
-| MONGO_SSL_ENABLED                 | Whether SSL is enabled while connecting to MongoDB                                                                                                         | string            |         |
-| MONGO_DB_NAME                     | Mongo database name                                                                                                                                        | string            |         |
-| MONGO_MIN_POOL_SIZE               | Min amount of connections to be retained into connection pool. See docs *                                                                                  | string            |         |
-| MONGO_MAX_POOL_SIZE               | Max amount of connections to be retained into connection pool. See docs *                                                                                  | string            |         |
-| MONGO_MAX_IDLE_TIMEOUT_MS         | Max timeout after which an idle connection is killed in milliseconds. See docs *                                                                           | string            |         |
-| MONGO_CONNECTION_TIMEOUT_MS       | Max time to wait for a connection to be opened. See docs *                                                                                                 | string            |         |
-| MONGO_SOCKET_TIMEOUT_MS           | Max time to wait for a command send or receive before timing out. See docs *                                                                               | string            |         |
-| MONGO_SERVER_SELECTION_TIMEOUT_MS | Max time to wait for a server to be selected while performing a communication with Mongo in milliseconds. See docs *                                       | string            |         |
-| MONGO_WAITING_QUEUE_MS            | Max time a thread has to wait for a connection to be available in milliseconds. See docs *                                                                 | string            |         |
-| MONGO_HEARTBEAT_FREQUENCY_MS      | Hearth beat frequency in milliseconds. This is an hello command that is sent periodically on each active connection to perform an health check. See docs * | string            |         |
-| REDIS_HOST                        | Redis host name                                                                                                                                            | string            |         |
-| REDIS_PROTOCOL                    | Redis protocol                                                                                                                                             | string            | rediss  |
-| REDIS_PASSWORD                    | Redis password                                                                                                                                             | string            |         |
-| REDIS_PORT                        | Redis port                                                                                                                                                 | string            |         |
-| REDIS_SSL_ENABLED                 | Whether SSL is enabled while connecting to  Redis                                                                                                          | string            |         |
-| REDIS_SUB_CONN_MIN                | Redis subscription minimum connection number                                                                                                               | long              |         |
-| REDIS_SUB_CONN_MAX                | Redis subscription maximum connection number                                                                                                               | long              |         |
-| REDIS_SLAVE_CONN_MIN              | Redis slave minimum connection number                                                                                                                      | long              |         |
-| REDIS_SLAVE_CONN_MAX              | Redis slave maximum connection number                                                                                                                      | long              |         |
-| REDIS_MASTER_CONN_MIN             | Redis master minimum connection number                                                                                                                     | long              |         |
-| REDIS_MASTER_CONN_MAX             | Redis master maximum connection number                                                                                                                     | long              |         |
-| CDC_LOG_EVENTS_COLLECTION_NAME    | The name of the collection the CDC will listen to                                                                                                          | string            |         |
-| CDC_LOG_EVENTS_OPERATION_TYPE     | List of operation type the CDC will handle                                                                                                                 | list of strings   |         |
-| CDC_LOG_EVENTS_PROJECT            | The field provided by the change stream event                                                                                                              | string            |         |
-| CDC_SEND_RETRY_MAX_ATTEMPTS       | Max configurable attempts for performing the logic business related to a change event                                                                      | long              | 3       |
-| CDC_SEND_RETRY_INTERVAL_IN_MS     | Configurable interval in milliseconds between retries attempts                                                                                             | long              | 1000    |
-| CDC_STREAM_RETRY_MAX_ATTEMPTS     | Max configurable attempts for reconnecting to DB                                                                                                           | long              | 5       |
-| CDC_STREAM_RETRY_INTERVAL_IN_MS   | Configurable interval in milliseconds between retries attempts                                                                                             | long              | 5000    |
-| CDC_REDIS_JOB_LOCK_KEYSPACE       | Prefix used for redis key name                                                                                                                             | string            |         |
-| CDC_REDIS_JOB_LOCK_TTL_MS         | Fallbacks in milliseconds before now in case lock is not released                                                                                          | long              |         |
-| CDC_REDIS_JOB_LOCK_WAIT_TIME_MS   | Wait time in milliseconds for lock acquisition before giving up                                                                                            | long              |         |
-| CDC_REDIS_RESUME_KEYSPACE         | Prefix used for redis key name                                                                                                                             | string            |         |
-| CDC_REDIS_RESUME_TARGET           | Target used as suffix for redis key name                                                                                                                   | string            |         |
-| CDC_REDIS_RESUME_FALLBACK_IN_MIN  | Fallbacks in minutes before now in case there is no resume token in cache                                                                                  | long              |         |
-| CDC_REDIS_RESUME_TTL_IN_MIN       | Time to live in minutes of Redis items                                                                                                                     | long              |         |
-| CDC_RESUME_SAVE_INTERVAL          | Interval with which the CDC saves resume token                                                                                                             | int               |         |
+| Variable name                              | Description                                                                                                                                                | type              | default |
+|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|---------|
+| ROOT_LOGGING_LEVEL                         | Application root logger level                                                                                                                              | string            | INFO    |
+| APP_LOGGING_LEVEL                          | it.pagopa logger level                                                                                                                                     | string            | INFO    |
+| WEB_LOGGING_LEVEL                          | Web logger level                                                                                                                                           | string            | INFO    |
+| MONGO_HOST                                 | Host where MongoDB instance used to persist transaction data                                                                                               | hostname (string) |         |
+| MONGO_PORT                                 | Port where MongoDB is bound to in MongoDB host                                                                                                             | number            |         |
+| MONGO_USERNAME                             | MongoDB username used to connect to the database                                                                                                           | string            |         |
+| MONGO_PASSWORD                             | MongoDB password used to connect to the database                                                                                                           | string            |         |
+| MONGO_SSL_ENABLED                          | Whether SSL is enabled while connecting to MongoDB                                                                                                         | string            |         |
+| MONGO_DB_NAME                              | Mongo database name                                                                                                                                        | string            |         |
+| MONGO_MIN_POOL_SIZE                        | Min amount of connections to be retained into connection pool. See docs *                                                                                  | string            |         |
+| MONGO_MAX_POOL_SIZE                        | Max amount of connections to be retained into connection pool. See docs *                                                                                  | string            |         |
+| MONGO_MAX_IDLE_TIMEOUT_MS                  | Max timeout after which an idle connection is killed in milliseconds. See docs *                                                                           | string            |         |
+| MONGO_CONNECTION_TIMEOUT_MS                | Max time to wait for a connection to be opened. See docs *                                                                                                 | string            |         |
+| MONGO_SOCKET_TIMEOUT_MS                    | Max time to wait for a command send or receive before timing out. See docs *                                                                               | string            |         |
+| MONGO_SERVER_SELECTION_TIMEOUT_MS          | Max time to wait for a server to be selected while performing a communication with Mongo in milliseconds. See docs *                                       | string            |         |
+| MONGO_WAITING_QUEUE_MS                     | Max time a thread has to wait for a connection to be available in milliseconds. See docs *                                                                 | string            |         |
+| MONGO_HEARTBEAT_FREQUENCY_MS               | Hearth beat frequency in milliseconds. This is an hello command that is sent periodically on each active connection to perform an health check. See docs * | string            |         |
+| REDIS_HOST                                 | Redis host name                                                                                                                                            | string            |         |
+| REDIS_PROTOCOL                             | Redis protocol                                                                                                                                             | string            | rediss  |
+| REDIS_PASSWORD                             | Redis password                                                                                                                                             | string            |         |
+| REDIS_PORT                                 | Redis port                                                                                                                                                 | string            |         |
+| REDIS_SSL_ENABLED                          | Whether SSL is enabled while connecting to  Redis                                                                                                          | string            |         |
+| REDIS_SUB_CONN_MIN                         | Redis subscription minimum connection number                                                                                                               | long              |         |
+| REDIS_SUB_CONN_MAX                         | Redis subscription maximum connection number                                                                                                               | long              |         |
+| REDIS_SLAVE_CONN_MIN                       | Redis slave minimum connection number                                                                                                                      | long              |         |
+| REDIS_SLAVE_CONN_MAX                       | Redis slave maximum connection number                                                                                                                      | long              |         |
+| REDIS_MASTER_CONN_MIN                      | Redis master minimum connection number                                                                                                                     | long              |         |
+| REDIS_MASTER_CONN_MAX                      | Redis master maximum connection number                                                                                                                     | long              |         |
+| CDC_LOG_EVENTS_COLLECTION_NAME             | The name of the collection the CDC will listen to                                                                                                          | string            |         |
+| CDC_LOG_EVENTS_OPERATION_TYPE              | List of operation type the CDC will handle                                                                                                                 | list of strings   |         |
+| CDC_LOG_EVENTS_PROJECT                     | The field provided by the change stream event                                                                                                              | string            |         |
+| CDC_SEND_RETRY_MAX_ATTEMPTS                | Max configurable attempts for performing the logic business related to a change event                                                                      | long              | 3       |
+| CDC_SEND_RETRY_INTERVAL_IN_MS              | Configurable interval in milliseconds between retries attempts                                                                                             | long              | 1000    |
+| CDC_STREAM_RETRY_MAX_ATTEMPTS              | Max configurable attempts for reconnecting to DB                                                                                                           | long              | 5       |
+| CDC_STREAM_RETRY_INTERVAL_IN_MS            | Configurable interval in milliseconds between retries attempts                                                                                             | long              | 5000    |
+| CDC_REDIS_JOB_LOCK_KEYSPACE                | Prefix used for redis key name                                                                                                                             | string            |         |
+| CDC_REDIS_JOB_LOCK_TTL_MS                  | Fallbacks in milliseconds before now in case lock is not released                                                                                          | long              |         |
+| CDC_REDIS_JOB_LOCK_WAIT_TIME_MS            | Wait time in milliseconds for lock acquisition before giving up                                                                                            | long              |         |
+| CDC_REDIS_RESUME_KEYSPACE                  | Prefix used for redis key name                                                                                                                             | string            |         |
+| CDC_REDIS_RESUME_TARGET                    | Target used as suffix for redis key name                                                                                                                   | string            |         |
+| CDC_REDIS_RESUME_FALLBACK_IN_MIN           | Fallbacks in minutes before now in case there is no resume token in cache                                                                                  | long              |         |
+| CDC_REDIS_RESUME_TTL_IN_MIN                | Time to live in minutes of Redis items                                                                                                                     | long              |         |
+| CDC_RESUME_SAVE_INTERVAL                   | Interval with which the CDC saves resume token                                                                                                             | int               |         |
+| ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME | eCommerce collection name that will host the transaction view documents                                                                                    | string            |         |
 
-(*): for Mongo connection string options see [docs](https://www.mongodb.com/docs/drivers/java/sync/v4.3/fundamentals/connection/connection-options/#connection-options)
+(*): for Mongo connection string options
+see [docs](https://www.mongodb.com/docs/drivers/java/sync/v4.3/fundamentals/connection/connection-options/#connection-options)
 
 ### Run docker container
 
-The easiest way to test the application is through a docker container connected to the dev environment. To do so follow these steps:
+The easiest way to test the application is through a docker container connected to the dev environment. To do so follow
+these steps:
 
-1. Create a `.env.dev` file starting from `.env.local` as example and replace the MongoDB values with dev environment settings:
+1. Create a `.env.dev` file starting from `.env.local` as example and replace the MongoDB values with dev environment
+   settings:
    ```sh
    cp .env.local .env.dev
    ```
@@ -120,16 +127,18 @@ Once the container is running, you can test the CDC functionality:
 
 ### Integration Testing with pagopa-ecommerce-local
 
-For comprehensive integration testing with the full eCommerce ecosystem, you should use the [pagopa-ecommerce-local](https://github.com/pagopa/pagopa-ecommerce-local) repository.
+For comprehensive integration testing with the full eCommerce ecosystem, you should use
+the [pagopa-ecommerce-local](https://github.com/pagopa/pagopa-ecommerce-local) repository.
 
 The CDC service is integrated into the local development environment and provides:
+
 - Complete eCommerce transaction flow
-- Real-time CDC event processing  
+- Real-time CDC event processing
 - End-to-end testing capabilities
 - Monitoring and observability tools
 
-When running with the full environment, the CDC service connects to shared MongoDB and integrates with all other eCommerce services.
-
+When running with the full environment, the CDC service connects to shared MongoDB and integrates with all other
+eCommerce services.
 
 ### Install eCommerce commons library locally
 

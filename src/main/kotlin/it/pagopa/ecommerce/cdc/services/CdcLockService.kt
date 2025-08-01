@@ -3,7 +3,6 @@ package it.pagopa.ecommerce.cdc.services
 import it.pagopa.ecommerce.cdc.config.properties.RedisJobLockPolicyConfig
 import it.pagopa.ecommerce.cdc.exceptions.CdcEventProcessingLockNotAcquiredException
 import java.util.concurrent.TimeUnit
-import kotlin.jvm.javaClass
 import org.redisson.api.RedissonReactiveClient
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
