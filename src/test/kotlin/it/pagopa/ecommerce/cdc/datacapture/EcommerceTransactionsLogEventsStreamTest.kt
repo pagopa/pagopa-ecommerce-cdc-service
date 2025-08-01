@@ -7,6 +7,7 @@ import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
+import it.pagopa.ecommerce.commons.v2.TransactionTestUtils
 import java.time.Duration
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -99,11 +100,15 @@ class EcommerceTransactionsLogEventsStreamTest {
         given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
         given(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
-            .willReturn(Mono.just(sampleDocument))
+            .willReturn(Mono.just(TransactionTestUtils.transactionActivateEvent()))
 
-        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
+        val activatedEvent = TransactionTestUtils.transactionActivateEvent()
 
-        StepVerifier.create(result).expectNext(sampleDocument).verifyComplete()
+        StepVerifier.create(
+                ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
+            )
+            .expectNext(activatedEvent)
+            .verifyComplete()
 
         verify(reactiveMongoTemplate, times(1))
             .changeStream(
@@ -113,7 +118,7 @@ class EcommerceTransactionsLogEventsStreamTest {
             )
 
         verify(cdcLockService, times(1)).acquireEventLock(any())
-        verify(ecommerceCDCEventDispatcherService, times(1)).dispatchEvent(eq(sampleDocument))
+        verify(ecommerceCDCEventDispatcherService, times(1)).dispatchEvent(eq(activatedEvent))
     }
 
     @Test
@@ -136,15 +141,18 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
 
+        val activatedEvent = TransactionTestUtils.transactionActivateEvent()
+
         whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
-            .thenReturn(Mono.just(sampleDocument))
-
-        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
-
-        StepVerifier.create(result).expectNext(sampleDocument).verifyComplete()
+            .thenReturn(Mono.just(activatedEvent))
+        StepVerifier.create(
+                ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
+            )
+            .expectNext(activatedEvent)
+            .verifyComplete()
 
         verify(cdcLockService).acquireEventLock(any())
-        verify(ecommerceCDCEventDispatcherService).dispatchEvent(sampleDocument)
+        verify(ecommerceCDCEventDispatcherService).dispatchEvent(activatedEvent)
     }
 
     @Test
@@ -168,13 +176,14 @@ class EcommerceTransactionsLogEventsStreamTest {
             .thenReturn(Flux.just(changeStreamEvent))
 
         whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+        val activatedEvent = TransactionTestUtils.transactionActivateEvent()
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(sampleDocument))
-            .thenReturn(Mono.just(sampleDocument))
+        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(activatedEvent))
+            .thenReturn(Mono.just(activatedEvent))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
-        StepVerifier.create(result).expectNext(sampleDocument).verifyComplete()
+        StepVerifier.create(result).expectNext(activatedEvent).verifyComplete()
 
         verify(reactiveMongoTemplate, times(2))
             .changeStream(
@@ -183,7 +192,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 eq(BsonDocument::class.java),
             )
         verify(cdcLockService).acquireEventLock(any())
-        verify(ecommerceCDCEventDispatcherService).dispatchEvent(sampleDocument)
+        verify(ecommerceCDCEventDispatcherService).dispatchEvent(activatedEvent)
     }
 
     @Test
@@ -228,8 +237,9 @@ class EcommerceTransactionsLogEventsStreamTest {
             .thenReturn(Flux.just(changeStreamEvent))
 
         whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+        val activatedEvent = TransactionTestUtils.transactionActivateEvent()
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(sampleDocument))
+        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(activatedEvent))
             .thenReturn(Mono.error(RuntimeException("Event processing failed")))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
@@ -237,7 +247,7 @@ class EcommerceTransactionsLogEventsStreamTest {
         StepVerifier.create(result).verifyComplete()
 
         verify(cdcLockService).acquireEventLock(any())
-        verify(ecommerceCDCEventDispatcherService).dispatchEvent(sampleDocument)
+        verify(ecommerceCDCEventDispatcherService).dispatchEvent(activatedEvent)
     }
 
     @Test
@@ -274,19 +284,24 @@ class EcommerceTransactionsLogEventsStreamTest {
             .thenReturn(Flux.just(event1, event2))
 
         whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+        val activatedEvent = TransactionTestUtils.transactionActivateEvent()
+        val authReqEvent = TransactionTestUtils.transactionAuthorizationRequestedEvent()
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(document1))
-            .thenReturn(Mono.just(document1))
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(document2))
-            .thenReturn(Mono.just(document2))
+        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(activatedEvent))
+            .thenReturn(Mono.just(activatedEvent))
+        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(authReqEvent))
+            .thenReturn(Mono.just(authReqEvent))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
-        StepVerifier.create(result).expectNext(document1).expectNext(document2).verifyComplete()
+        StepVerifier.create(result)
+            .expectNext(activatedEvent)
+            .expectNext(authReqEvent)
+            .verifyComplete()
 
         verify(cdcLockService, times(2)).acquireEventLock(any())
-        verify(ecommerceCDCEventDispatcherService).dispatchEvent(document1)
-        verify(ecommerceCDCEventDispatcherService).dispatchEvent(document2)
+        verify(ecommerceCDCEventDispatcherService).dispatchEvent(activatedEvent)
+        verify(ecommerceCDCEventDispatcherService).dispatchEvent(authReqEvent)
     }
 
     @Test
@@ -615,14 +630,16 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
 
+        val activatedEvent = TransactionTestUtils.transactionActivateEvent()
+
         whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
-            .thenReturn(Mono.just(document))
+            .thenReturn(Mono.just(activatedEvent))
 
         doNothing().whenever(redisResumePolicyService).saveResumeTimestamp(any())
 
         val result = customStream.streamEcommerceTransactionsLogEvents()
 
-        StepVerifier.create(result).expectNext(document).verifyComplete()
+        StepVerifier.create(result).expectNext(activatedEvent).verifyComplete()
 
         // Verify that saveResumeTimestamp was called exactly once with the expected timestamp
         verify(redisResumePolicyService, times(1)).saveResumeTimestamp(eq(expectedInstant))

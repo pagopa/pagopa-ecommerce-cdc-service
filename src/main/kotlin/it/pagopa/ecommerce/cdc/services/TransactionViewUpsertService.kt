@@ -1,5 +1,7 @@
 package it.pagopa.ecommerce.cdc.services
 
+import it.pagopa.ecommerce.cdc.exceptions.CdcEventTypeException
+import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
 import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import it.pagopa.ecommerce.commons.documents.v2.*
 import it.pagopa.ecommerce.commons.documents.v2.authorization.NpgTransactionGatewayAuthorizationData
@@ -38,65 +40,73 @@ class TransactionViewUpsertService(
      */
     fun upsertEventData(transactionId: String, event: TransactionEvent<*>): Mono<Unit> {
         return Mono.defer {
-            val eventCode = event.eventCode
+                val eventCode = event.eventCode
 
-            logger.debug(
-                "Upserting transaction view data for _id: [{}], eventCode: [{}]",
-                transactionId,
-                eventCode,
-            )
+                logger.debug(
+                    "Upserting transaction view data for _id: [{}], eventCode: [{}]",
+                    transactionId,
+                    eventCode,
+                )
 
-            val queryByTransactionId =
-                Query.query(Criteria.where("transactionId").`is`(transactionId))
+                val queryByTransactionId =
+                    Query.query(Criteria.where("transactionId").`is`(transactionId))
 
-            val queryByTransactionAndLastProcessedEventAtCondition =
-                Query.query(Criteria.where("transactionId").`is`(transactionId))
-                    .addCriteria(
-                        Criteria.where("lastProcessedEventAt")
-                            .exists(false)
-                            .orOperator(
-                                Criteria.where("lastProcessedEventAt")
-                                    .lt(
-                                        ZonedDateTime.parse(event.creationDate)
-                                            .toInstant()
-                                            .toEpochMilli()
+                val queryByTransactionAndLastProcessedEventAtCondition =
+                    Query.query(Criteria.where("transactionId").`is`(transactionId))
+                        .addCriteria(
+                            Criteria.where("lastProcessedEventAt")
+                                .exists(false)
+                                .orOperator(
+                                    Criteria.where("lastProcessedEventAt")
+                                        .lt(
+                                            ZonedDateTime.parse(event.creationDate)
+                                                .toInstant()
+                                                .toEpochMilli()
+                                        )
+                                )
+                        )
+
+                buildUpdateFromEvent(event)
+                    .flatMap { (update, updateStatus) ->
+                        mongoTemplate
+                            .upsert(
+                                queryByTransactionAndLastProcessedEventAtCondition,
+                                updateStatus!!,
+                                BaseTransactionView::class.java,
+                                transactionViewName,
+                            )
+                            .filter { it -> it.matchedCount > 0 }
+                            .switchIfEmpty(
+                                Mono.justOrEmpty(update)
+                                    .flatMap { upd ->
+                                        mongoTemplate.upsert(
+                                            queryByTransactionId,
+                                            upd!!,
+                                            BaseTransactionView::class.java,
+                                            transactionViewName,
+                                        )
+                                    }
+                                    .switchIfEmpty(
+                                        Mono.error {
+                                            CdcQueryMatchException(
+                                                "Query didn't match any condition to update the view"
+                                            )
+                                        }
                                     )
                             )
-                    )
-
-            buildUpdateFromEvent(event)
-                .flatMap { (update, updateStatus) ->
-                    mongoTemplate
-                        .upsert(
-                            queryByTransactionAndLastProcessedEventAtCondition,
-                            updateStatus,
-                            BaseTransactionView::class.java,
-                            transactionViewName,
+                    }
+                    .doOnNext { updateResult ->
+                        logger.debug(
+                            "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
+                            transactionId,
+                            eventCode,
+                            updateResult.matchedCount,
+                            updateResult.modifiedCount,
+                            updateResult.upsertedId != null,
                         )
-                        .filter { it -> it.matchedCount > 0 }
-                        .switchIfEmpty(
-                            Mono.justOrEmpty(update).flatMap { upd ->
-                                mongoTemplate.upsert(
-                                    queryByTransactionId,
-                                    upd!!,
-                                    BaseTransactionView::class.java,
-                                    transactionViewName,
-                                )
-                            }
-                        )
-                }
-                .doOnNext { updateResult ->
-                    logger.debug(
-                        "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
-                        transactionId,
-                        eventCode,
-                        updateResult.matchedCount,
-                        updateResult.modifiedCount,
-                        updateResult.upsertedId != null,
-                    )
-                }
-                .thenReturn(Unit)
-        }
+                    }
+                    .thenReturn(Unit)
+            }
             .doOnSuccess { _ ->
                 logger.info("Successfully upserted transaction view for _id: [{}]", transactionId)
             }
@@ -116,31 +126,29 @@ class TransactionViewUpsertService(
      * @param event The MongoDB change stream event document
      * @return Update object with field updates based on event type
      */
-    private fun buildUpdateFromEvent(event: TransactionEvent<*>): Mono<Pair<Update?, Update>> {
-        val update = Update()
+    private fun buildUpdateFromEvent(event: TransactionEvent<*>): Mono<Pair<Update?, Update?>> {
         val eventCode = event.eventCode
         // apply updates based on specific event types
-        val result =
+        val result: Pair<Update?, Update?> =
             when (event) {
-                is TransactionActivatedEvent -> updateActivationData(update, event)
-                is TransactionAuthorizationRequestedEvent -> updateAuthRequestData(update, event)
-                is TransactionAuthorizationCompletedEvent -> updateAuthCompletedData(update, event)
-                is TransactionUserReceiptRequestedEvent -> updateUserReceiptData(update, event)
-                is TransactionClosedEvent -> updateClosedData(update, event)
-                is TransactionClosureErrorEvent -> updateClosureErrorData(update, event)
-                is TransactionClosureRetriedEvent -> updateClosureRetriedData(update, event)
-                is TransactionExpiredEvent -> updateExpiredData(update, event)
-                is TransactionRefundRequestedEvent -> updateRefundRequestData(update, event)
-                is TransactionUserCanceledEvent -> updateUserCanceledData(update, event)
-                is TransactionClosureRequestedEvent -> updateClosureRequestData(update, event)
-                is TransactionRefundErrorEvent -> updateRefundErrorData(update, event)
-                is TransactionUserReceiptAddedEvent -> updateUserReceiptAddedData(update, event)
-                is TransactionUserReceiptAddErrorEvent -> updateUserReceiptErrorData(update, event)
-                is TransactionClosureFailedEvent -> updateClosureFailedData(update, event)
-                is TransactionRefundedEvent -> updateRefundedData(update, event)
-                is TransactionRefundRetriedEvent -> updateRefundRetriedData(update, event)
-                is TransactionUserReceiptAddRetriedEvent ->
-                    updateUserReceiptRetryData(update, event)
+                is TransactionActivatedEvent -> updateActivationData(event)
+                is TransactionAuthorizationRequestedEvent -> updateAuthRequestData(event)
+                is TransactionAuthorizationCompletedEvent -> updateAuthCompletedData(event)
+                is TransactionUserReceiptRequestedEvent -> updateUserReceiptData(event)
+                is TransactionClosedEvent -> updateClosedData(event)
+                is TransactionClosureErrorEvent -> updateClosureErrorData(event)
+                is TransactionClosureRetriedEvent -> updateClosureRetriedData(event)
+                is TransactionExpiredEvent -> updateExpiredData(event)
+                is TransactionRefundRequestedEvent -> updateRefundRequestData(event)
+                is TransactionUserCanceledEvent -> updateUserCanceledData(event)
+                is TransactionClosureRequestedEvent -> updateClosureRequestData(event)
+                is TransactionRefundErrorEvent -> updateRefundErrorData(event)
+                is TransactionUserReceiptAddedEvent -> updateUserReceiptAddedData(event)
+                is TransactionUserReceiptAddErrorEvent -> updateUserReceiptErrorData(event)
+                is TransactionClosureFailedEvent -> updateClosureFailedData(event)
+                is TransactionRefundedEvent -> updateRefundedData(event)
+                is TransactionRefundRetriedEvent -> updateRefundRetriedData(event)
+                is TransactionUserReceiptAddRetriedEvent -> updateUserReceiptRetryData(event)
 
                 else -> {
                     logger.warn(
@@ -148,22 +156,24 @@ class TransactionViewUpsertService(
                         eventCode,
                         event.javaClass,
                     )
-                    null
+                    return Mono.error {
+                        CdcEventTypeException(
+                            "Cannot handle event with eventCode: $eventCode Event class: ${event.javaClass}"
+                        )
+                    }
                 }
             }
 
         return mono { result }
-                as Mono<Pair<Update?, Update>> // FIXME Verificare perchè restituisce Any
     }
 
     /**
      * Updates fields for TRANSACTION_ACTIVATED_EVENT. This creates the initial transaction view
      * document with all basic transaction information.
      */
-    private fun updateActivationData(
-        update: Update,
-        event: TransactionActivatedEvent,
-    ): Pair<Update?, Update> {
+    private fun updateActivationData(event: TransactionActivatedEvent): Pair<Update?, Update> {
+        val update = Update()
+        val statusUpdate = Update()
         val data = event.data
         update["email"] = data.email.opaqueData
         update["paymentNotices"] = data.paymentNotices
@@ -171,7 +181,11 @@ class TransactionViewUpsertService(
         update["creationDate"] = event.creationDate
         update["_class"] = Transaction::class.java.canonicalName
 
-        val statusUpdate = update
+        statusUpdate["email"] = data.email.opaqueData
+        statusUpdate["paymentNotices"] = data.paymentNotices
+        statusUpdate["clientId"] = data.clientId
+        statusUpdate["creationDate"] = event.creationDate
+        statusUpdate["_class"] = Transaction::class.java.canonicalName
         statusUpdate["status"] = TransactionStatusDto.ACTIVATED
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
@@ -184,16 +198,20 @@ class TransactionViewUpsertService(
      * information and authorization details.
      */
     private fun updateAuthRequestData(
-        update: Update,
-        event: TransactionAuthorizationRequestedEvent,
-    ): Pair<Update?, Update> {
+        event: TransactionAuthorizationRequestedEvent
+    ): Pair<Update?, Update?> {
+        val update = Update()
+        val statusUpdate = Update()
         val authorizationRequestedData = event.data
         update["paymentGateway"] = authorizationRequestedData.paymentGateway
         update["paymentTypeCode"] = authorizationRequestedData.paymentTypeCode
         update["pspId"] = authorizationRequestedData.pspId
         update["feeTotal"] = authorizationRequestedData.fee
 
-        val statusUpdate = update
+        statusUpdate["paymentGateway"] = authorizationRequestedData.paymentGateway
+        statusUpdate["paymentTypeCode"] = authorizationRequestedData.paymentTypeCode
+        statusUpdate["pspId"] = authorizationRequestedData.pspId
+        statusUpdate["feeTotal"] = authorizationRequestedData.fee
         statusUpdate["status"] = TransactionStatusDto.AUTHORIZATION_REQUESTED
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
@@ -206,13 +224,16 @@ class TransactionViewUpsertService(
      * gateway response information.
      */
     private fun updateAuthCompletedData(
-        update: Update,
-        event: TransactionAuthorizationCompletedEvent,
-    ): Pair<Update?, Update> {
+        event: TransactionAuthorizationCompletedEvent
+    ): Pair<Update?, Update?> {
+        val update = Update()
+        val statusUpdate = Update()
         val data = event.data
 
         update["rrn"] = data.rrn
         update["authorizationCode"] = data.authorizationCode
+        statusUpdate["rrn"] = data.rrn
+        statusUpdate["authorizationCode"] = data.authorizationCode
 
         val gatewayAuthData = data.transactionGatewayAuthorizationData
 
@@ -220,11 +241,15 @@ class TransactionViewUpsertService(
             is NpgTransactionGatewayAuthorizationData -> {
                 update["gatewayAuthorizationStatus"] = gatewayAuthData.operationResult
                 update["authorizationErrorCode"] = gatewayAuthData.errorCode
+                statusUpdate["gatewayAuthorizationStatus"] = gatewayAuthData.operationResult
+                statusUpdate["authorizationErrorCode"] = gatewayAuthData.errorCode
             }
 
             is RedirectTransactionGatewayAuthorizationData -> {
                 update["gatewayAuthorizationStatus"] = gatewayAuthData.outcome
                 update["authorizationErrorCode"] = gatewayAuthData.errorCode
+                statusUpdate["gatewayAuthorizationStatus"] = gatewayAuthData.outcome
+                statusUpdate["authorizationErrorCode"] = gatewayAuthData.errorCode
             }
 
             else ->
@@ -234,7 +259,6 @@ class TransactionViewUpsertService(
                 )
         }
 
-        val statusUpdate = update
         statusUpdate["status"] = TransactionStatusDto.AUTHORIZATION_COMPLETED
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
@@ -247,25 +271,26 @@ class TransactionViewUpsertService(
      * details.
      */
     private fun updateClosureRequestData(
-        update: Update,
-        event: TransactionClosureRequestedEvent,
-    ): Pair<Update?, Update> {
-        update["status"] = TransactionStatusDto.CLOSURE_REQUESTED
-        update["lastProcessedEventAt"] =
+        event: TransactionClosureRequestedEvent
+    ): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["status"] = TransactionStatusDto.CLOSURE_REQUESTED
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(null, update)
+        return Pair(null, statusUpdate)
     }
 
     /**
      * Updates fields for TRANSACTION_USER_RECEIPT_REQUESTED_EVENT. Adds user receipt information.
      */
     private fun updateUserReceiptData(
-        update: Update,
-        event: TransactionUserReceiptRequestedEvent,
-    ): Pair<Update?, Update> {
+        event: TransactionUserReceiptRequestedEvent
+    ): Pair<Update?, Update?> {
+        val update = Update()
+        val statusUpdate = Update()
         update["sendPaymentResultOutcome"] = event.data.responseOutcome
+        statusUpdate["sendPaymentResultOutcome"] = event.data.responseOutcome
 
-        val statusUpdate = update
         statusUpdate["status"] = TransactionStatusDto.NOTIFICATION_REQUESTED
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
@@ -274,156 +299,160 @@ class TransactionViewUpsertService(
     }
 
     /** Updates fields for TRANSACTION_EXPIRED_EVENT. Adds expiration information. */
-    private fun updateExpiredData(
-        update: Update,
-        event: TransactionExpiredEvent,
-    ): Pair<Update?, Update> {
-        update["status"] = TransactionStatusDto.EXPIRED
-        update["lastProcessedEventAt"] =
+    private fun updateExpiredData(event: TransactionExpiredEvent): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["status"] = TransactionStatusDto.EXPIRED
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(null, update)
+        return Pair(null, statusUpdate)
     }
 
     /** Updates fields for TRANSACTION_REFUND_REQUESTED_EVENT. Adds refund request information. */
     private fun updateRefundRequestData(
-        update: Update,
-        event: TransactionRefundRequestedEvent,
-    ): Pair<Update?, Update> {
-        update["status"] = TransactionStatusDto.REFUND_REQUESTED
-        update["lastProcessedEventAt"] =
+        event: TransactionRefundRequestedEvent
+    ): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["status"] = TransactionStatusDto.REFUND_REQUESTED
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(null, update)
+        return Pair(null, statusUpdate)
     }
 
     /**
      * Updates fields for TRANSACTION_CLOSED_EVENT. Sets sendPaymentResultOutcome and closure
      * timestamp.
      */
-    private fun updateClosedData(update: Update, event: TransactionClosedEvent): Update {
-        if (event.data.responseOutcome == TransactionClosureData.Outcome.OK) {
-            update["sendPaymentResultOutcome"] = TransactionUserReceiptData.Outcome.NOT_RECEIVED
-            update["closureErrorData"] = null
-        }
-        // FIXME Ci manca la reduce degli eventi o la view o l'evento precedente, valutare find
-        // apposita
-        return update
+    private fun updateClosedData(event: TransactionClosedEvent): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["sendPaymentResultOutcome"] = TransactionUserReceiptData.Outcome.NOT_RECEIVED
+        statusUpdate["closureErrorData"] = null
+        statusUpdate["status"] =
+            when (event.data.wasCanceledByUser) {
+                true -> TransactionStatusDto.CANCELED
+                else ->
+                    when (event.data.responseOutcome) {
+                        TransactionClosureData.Outcome.OK -> TransactionStatusDto.CLOSED
+                        TransactionClosureData.Outcome.KO -> TransactionStatusDto.UNAUTHORIZED
+                    }
+            }
+
+        statusUpdate["lastProcessedEventAt"] =
+            ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
+
+        return Pair(null, statusUpdate)
     }
 
     /** Updates fields for TRANSACTION_USER_CANCELED_EVENT. Adds cancellation timestamp. */
     private fun updateUserCanceledData(
-        update: Update,
-        event: TransactionUserCanceledEvent,
-    ): Pair<Update?, Update> {
-        update["status"] = TransactionStatusDto.CANCELLATION_REQUESTED
-        update["lastProcessedEventAt"] =
+        event: TransactionUserCanceledEvent
+    ): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["status"] = TransactionStatusDto.CANCELLATION_REQUESTED
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(null, update)
+        return Pair(null, statusUpdate)
     }
 
     /** Updates fields for TRANSACTION_REFUND_ERROR_EVENT. Adds refund error information. */
-    private fun updateRefundErrorData(
-        update: Update,
-        event: TransactionRefundErrorEvent,
-    ): Pair<Update?, Update> {
-        update["status"] = TransactionStatusDto.REFUND_ERROR
-        update["lastProcessedEventAt"] =
+    private fun updateRefundErrorData(event: TransactionRefundErrorEvent): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["status"] = TransactionStatusDto.REFUND_ERROR
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(null, update)
+        return Pair(null, statusUpdate)
     }
 
     /** Updates fields for TRANSACTION_CLOSURE_ERROR_EVENT. Adds closure error timestamp. */
     private fun updateClosureErrorData(
-        update: Update,
-        event: TransactionClosureErrorEvent,
-    ): Pair<Update?, Update> {
-        update["closureErrorData"] = event.data
-        update["status"] = TransactionStatusDto.CLOSURE_ERROR
-        update["lastProcessedEventAt"] =
+        event: TransactionClosureErrorEvent
+    ): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["closureErrorData"] = event.data
+        statusUpdate["status"] = TransactionStatusDto.CLOSURE_ERROR
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(null, update)
+        return Pair(null, statusUpdate)
     }
 
     /** Updates fields for TRANSACTION_USER_RECEIPT_ADDED_EVENT. Sets notification outcome. */
     private fun updateUserReceiptAddedData(
-        update: Update,
-        event: TransactionUserReceiptAddedEvent,
-    ): Pair<Update?, Update> {
+        event: TransactionUserReceiptAddedEvent
+    ): Pair<Update?, Update?> {
+        val statusUpdate = Update()
         when (event.data.responseOutcome) {
             TransactionUserReceiptData.Outcome.OK ->
-                update["status"] = TransactionStatusDto.NOTIFIED_OK
+                statusUpdate["status"] = TransactionStatusDto.NOTIFIED_OK
             TransactionUserReceiptData.Outcome.KO ->
-                update["status"] = TransactionStatusDto.NOTIFIED_KO
+                statusUpdate["status"] = TransactionStatusDto.NOTIFIED_KO
             else -> {} // throw exception
         }
-        update["lastProcessedEventAt"] =
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
 
-        return Pair(null, update)
+        return Pair(null, statusUpdate)
     }
 
     /**
      * Updates fields for TRANSACTION_ADD_USER_RECEIPT_ERROR_EVENT. Adds receipt error information.
      */
     private fun updateUserReceiptErrorData(
-        update: Update,
-        event: TransactionUserReceiptAddErrorEvent,
-    ): Pair<Update?, Update> {
-        update["status"] = TransactionStatusDto.NOTIFICATION_ERROR
-        update["lastProcessedEventAt"] =
+        event: TransactionUserReceiptAddErrorEvent
+    ): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["status"] = TransactionStatusDto.NOTIFICATION_ERROR
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(null, update)
+        return Pair(null, statusUpdate)
     }
 
     /** Updates fields for TRANSACTION_CLOSURE_RETRIED_EVENT. Adds closure retry information. */
     private fun updateClosureRetriedData(
-        update: Update,
-        event: TransactionClosureRetriedEvent,
-    ): Pair<Update?, Update> {
-        update["sendPaymentResultOutcome"] = TransactionUserReceiptData.Outcome.NOT_RECEIVED
+        event: TransactionClosureRetriedEvent
+    ): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["sendPaymentResultOutcome"] = TransactionUserReceiptData.Outcome.NOT_RECEIVED
         if (event.data.closureErrorData != null) {
-            update["closureErrorData"] = event.data.closureErrorData
+            statusUpdate["closureErrorData"] = event.data.closureErrorData
         }
-        update["lastProcessedEventAt"] =
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
 
         return Pair(
             null,
-            update,
+            statusUpdate,
         ) // Doesn't update the state but it has to be processed coditionally on its timestamp
     }
 
     /** Updates fields for TRANSACTION_CLOSURE_FAILED_EVENT. Adds closure failure information. */
     private fun updateClosureFailedData(
-        update: Update,
-        event: TransactionClosureFailedEvent,
-    ): Pair<Update?, Update> {
-        update["status"] = TransactionStatusDto.UNAUTHORIZED
-        update["lastProcessedEventAt"] =
+        event: TransactionClosureFailedEvent
+    ): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["status"] = TransactionStatusDto.UNAUTHORIZED
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(null, update)
+        return Pair(null, statusUpdate)
     }
 
     /** Updates fields for TRANSACTION_REFUNDED_EVENT. Adds refund completion information. */
-    private fun updateRefundedData(
-        update: Update,
-        event: TransactionRefundedEvent,
-    ): Pair<Update?, Update> {
-        update["status"] = TransactionStatusDto.REFUNDED
-        update["lastProcessedEventAt"] =
+    private fun updateRefundedData(event: TransactionRefundedEvent): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["status"] = TransactionStatusDto.REFUNDED
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(null, update)
+        return Pair(null, statusUpdate)
     }
 
     /** Updates fields for TRANSACTION_REFUND_RETRIED_EVENT. Adds refund retry information. */
     private fun updateRefundRetriedData(
-        update: Update,
-        event: TransactionRefundRetriedEvent,
-    ): Pair<Update?, Update> {
-        update["lastProcessedEventAt"] =
+        event: TransactionRefundRetriedEvent
+    ): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
         return Pair(
             null,
-            update,
+            statusUpdate,
         ) // Doesn't update the state but it has to be processed coditionally on its timestamp.
         // Maybe it could be skipped
     }
@@ -432,14 +461,14 @@ class TransactionViewUpsertService(
      * Updates fields for TRANSACTION_ADD_USER_RECEIPT_RETRY_EVENT. Adds receipt retry information.
      */
     private fun updateUserReceiptRetryData(
-        update: Update,
-        event: TransactionUserReceiptAddRetriedEvent,
-    ): Pair<Update?, Update> {
-        update["lastProcessedEventAt"] =
+        event: TransactionUserReceiptAddRetriedEvent
+    ): Pair<Update?, Update?> {
+        val statusUpdate = Update()
+        statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
         return Pair(
             null,
-            update,
+            statusUpdate,
         ) // Doesn't update the state but it has to be processed coditionally on its timestamp.
         // Maybe it could be skipped
     }
