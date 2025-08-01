@@ -38,16 +38,15 @@ class TransactionViewUpsertService(
      * @param event The MongoDB change stream event document
      * @return Mono<Void> Completes when the upsert operation succeeds
      */
-    fun upsertEventData(transactionId: String, event: TransactionEvent<*>): Mono<Unit> {
+    fun upsertEventData(event: TransactionEvent<*>): Mono<Unit> {
+        val eventCode = event.eventCode
+        val transactionId = event.transactionId
         return Mono.defer {
-                val eventCode = event.eventCode
-
                 logger.debug(
                     "Upserting transaction view data for _id: [{}], eventCode: [{}]",
                     transactionId,
                     eventCode,
                 )
-
                 val queryByTransactionId =
                     Query.query(Criteria.where("transactionId").`is`(transactionId))
 
