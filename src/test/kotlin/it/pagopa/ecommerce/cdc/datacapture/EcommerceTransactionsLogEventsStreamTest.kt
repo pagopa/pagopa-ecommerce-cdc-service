@@ -8,6 +8,7 @@ import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
+import it.pagopa.ecommerce.commons.v2.TransactionTestUtils
 import java.time.Duration
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -84,9 +85,11 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         given(ecommerceCDCEventDispatcherService.dispatchEvent(any())).willReturn(Mono.just(event))
 
-        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
+        val activatedEvent = TransactionTestUtils.transactionActivateEvent()
 
-        StepVerifier.create(result).expectNext(event).verifyComplete()
+        StepVerifier.create(ecommerceCDCEventDispatcherService.dispatchEvent(activatedEvent))
+            .expectNext(event)
+            .verifyComplete()
 
         verify(cdcLockService).acquireEventLock(any())
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(event)
@@ -124,6 +127,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 eq(TransactionEvent::class.java),
             )
         verify(cdcLockService).acquireEventLock(any())
+
         verify(ecommerceCDCEventDispatcherService)
             .dispatchEvent(
                 argThat { dispatchedEvent ->
@@ -181,6 +185,7 @@ class EcommerceTransactionsLogEventsStreamTest {
         StepVerifier.create(result).verifyComplete()
 
         verify(cdcLockService).acquireEventLock(any())
+
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(event)
     }
 
@@ -204,7 +209,6 @@ class EcommerceTransactionsLogEventsStreamTest {
                 )
             )
             .willReturn(Flux.just(changeStreamEvent1, changeStreamEvent2))
-
         given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
         given(ecommerceCDCEventDispatcherService.dispatchEvent(event1))
