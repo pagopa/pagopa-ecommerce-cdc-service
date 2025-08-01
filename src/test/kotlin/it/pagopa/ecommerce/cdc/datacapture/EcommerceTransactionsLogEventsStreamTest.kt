@@ -6,13 +6,14 @@ import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
 import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
-import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
+import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent
+import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createMockChangeStreamEventWithNullDocument
+import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
 import java.time.Instant
 import java.time.ZonedDateTime
 import kotlin.test.assertEquals
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mockito
@@ -21,23 +22,11 @@ import org.mockito.kotlin.*
 import org.springframework.data.mongodb.core.ChangeStreamOptions
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Hooks
 import reactor.core.publisher.Mono
 import reactor.test.StepVerifier
 
 @ExtendWith(MockitoExtension::class)
 class EcommerceTransactionsLogEventsStreamTest {
-
-    companion object {
-        private val redisResumePolicyService: RedisResumePolicyService = mock()
-
-        @BeforeAll
-        @JvmStatic
-        fun setup() {
-            Hooks.onOperatorDebug()
-            given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
-        }
-    }
 
     private val reactiveMongoTemplate = Mockito.mock<ReactiveMongoTemplate>()
     private val cdcLockService: CdcLockService = mock()
@@ -53,6 +42,7 @@ class EcommerceTransactionsLogEventsStreamTest {
     private val retryStreamPolicyConfig =
         RetryStreamPolicyConfig(maxAttempts = 3, intervalInMs = 1000)
     private val saveInterval = 10
+    private val redisResumePolicyService: RedisResumePolicyService = mock()
 
     private val ecommerceTransactionsLogEventsStream: EcommerceTransactionsLogEventsStream =
         EcommerceTransactionsLogEventsStream(
@@ -67,10 +57,9 @@ class EcommerceTransactionsLogEventsStreamTest {
 
     @Test
     fun `should successfully process change stream events`() {
-        val event = EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent()
-        val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(operationType = "insert")
-
+        val event = createSampleEventStoreEvent()
+        val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
@@ -95,9 +84,9 @@ class EcommerceTransactionsLogEventsStreamTest {
     @Test
     fun `should handle MongoDB connection errors with retry`() {
         val mongoException = MongoException("Connection failed")
-        val event = EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent()
-        val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(operationType = "insert")
+        val event = createSampleEventStoreEvent()
+        val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -136,9 +125,8 @@ class EcommerceTransactionsLogEventsStreamTest {
     @Test
     fun `should handle null documents gracefully`() {
         val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEventWithNullDocument(
-                operationType = "insert"
-            )
+            createMockChangeStreamEventWithNullDocument(operationType = "insert")
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -158,9 +146,9 @@ class EcommerceTransactionsLogEventsStreamTest {
 
     @Test
     fun `should handle event dispatcher errors gracefully`() {
-        val event = EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent()
-        val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(operationType = "insert")
+        val event = createSampleEventStoreEvent()
+        val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -186,15 +174,14 @@ class EcommerceTransactionsLogEventsStreamTest {
 
     @Test
     fun `should process multiple events in sequence`() {
-        val event1 =
-            EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent(eventId = "event1")
-        val event2 =
-            EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent(eventId = "event2")
+        val event1 = createSampleEventStoreEvent(eventId = "event1")
+        val event2 = createSampleEventStoreEvent(eventId = "event2")
 
         val changeStreamEvent1 =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(operationType = "insert")
+            createMockChangeStreamEvent(operationType = "insert", event = event1)
         val changeStreamEvent2 =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(operationType = "update")
+            createMockChangeStreamEvent(operationType = "update", event = event2)
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -219,13 +206,14 @@ class EcommerceTransactionsLogEventsStreamTest {
         verify(cdcLockService, times(2)).acquireEventLock(any())
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(event1)
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(event2)
-        verify(cdcLockService, times(1)).acquireEventLock(event1.transactionId)
-        verify(cdcLockService, times(1)).acquireEventLock(event2.transactionId)
+        verify(cdcLockService, times(1)).acquireEventLock(event1.id)
+        verify(cdcLockService, times(1)).acquireEventLock(event2.id)
     }
 
     @Test
     fun `should exhaust retry attempts for persistent MongoDB errors`() {
         val mongoException = MongoException("Persistent connection error")
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -253,6 +241,7 @@ class EcommerceTransactionsLogEventsStreamTest {
     @Test
     fun `should not retry for non-MongoDB exceptions`() {
         val runtimeException = RuntimeException("Non-MongoDB error")
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -280,7 +269,11 @@ class EcommerceTransactionsLogEventsStreamTest {
     @Test
     fun `should not process event when lock acquisition fails`() {
         val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(operationType = "insert")
+            createMockChangeStreamEvent(
+                operationType = "insert",
+                event = createSampleEventStoreEvent(),
+            )
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -304,7 +297,11 @@ class EcommerceTransactionsLogEventsStreamTest {
     @Test
     fun `should handle lock acquisition errors gracefully`() {
         val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(operationType = "insert")
+            createMockChangeStreamEvent(
+                operationType = "insert",
+                event = createSampleEventStoreEvent(),
+            )
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -332,7 +329,7 @@ class EcommerceTransactionsLogEventsStreamTest {
         val startDate = ZonedDateTime.now()
         val events =
             (1..12).map { i ->
-                EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent(
+                createSampleEventStoreEvent(
                     eventId = "event_$i",
                     creationDate = startDate + Duration.ofSeconds(i.toLong()),
                 )
@@ -340,12 +337,10 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         val changeStreamEvents =
             events.map { event ->
-                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                    operationType = "insert",
-                    event = event,
-                )
+                createMockChangeStreamEvent(operationType = "insert", event = event)
             }
 
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
@@ -376,11 +371,21 @@ class EcommerceTransactionsLogEventsStreamTest {
 
     @Test
     fun `should not save resume token when not at interval boundary`() {
+        val logEventStream =
+            EcommerceTransactionsLogEventsStream(
+                reactiveMongoTemplate,
+                changeStreamOptionsConfig,
+                ecommerceCDCEventDispatcherService,
+                retryStreamPolicyConfig,
+                cdcLockService,
+                redisResumePolicyService,
+                10,
+            )
         // Create test documents - only 5 elements, so with saveInterval = 10, no saves should occur
         val startDate = ZonedDateTime.now()
         val events =
             (1..5).map { i ->
-                EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent(
+                createSampleEventStoreEvent(
                     eventId = "event_$i",
                     creationDate = startDate + Duration.ofSeconds(1.toLong()),
                 )
@@ -388,12 +393,10 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         val changeStreamEvents =
             events.map { event ->
-                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                    operationType = "insert",
-                    event = event,
-                )
+                createMockChangeStreamEvent(operationType = "insert", event = event)
             }
 
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
@@ -409,7 +412,7 @@ class EcommerceTransactionsLogEventsStreamTest {
             Mono.just(it.arguments[0])
         }
 
-        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
+        val result = logEventStream.streamEcommerceTransactionsLogEvents()
 
         StepVerifier.create(result).expectNextCount(5).verifyComplete()
 
@@ -435,17 +438,11 @@ class EcommerceTransactionsLogEventsStreamTest {
         val expectedTimestamp = ZonedDateTime.parse("2025-01-01T00:00:00.000000000Z[GMT]")
         val expectedInstant = expectedTimestamp.toInstant()
 
-        val event =
-            EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent(
-                creationDate = expectedTimestamp
-            )
+        val event = createSampleEventStoreEvent(creationDate = expectedTimestamp)
 
-        val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                operationType = "insert",
-                event = event,
-            )
+        val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
 
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
@@ -485,7 +482,7 @@ class EcommerceTransactionsLogEventsStreamTest {
         val startDate = ZonedDateTime.now()
         val events =
             (1..3).map { i ->
-                EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent(
+                createSampleEventStoreEvent(
                     eventId = "event_$i",
                     creationDate = startDate + Duration.ofSeconds(1),
                 )
@@ -493,12 +490,10 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         val changeStreamEvents =
             events.map { event ->
-                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                    operationType = "insert",
-                    event = event,
-                )
+                createMockChangeStreamEvent(operationType = "insert", event = event)
             }
 
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),

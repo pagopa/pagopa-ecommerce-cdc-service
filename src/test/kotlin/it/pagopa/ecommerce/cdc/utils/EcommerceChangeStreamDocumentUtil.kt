@@ -34,7 +34,7 @@ object EcommerceChangeStreamDocumentUtil {
     /** Creates a mock ChangeStreamEvent for testing purposes using Mockito. */
     fun createMockChangeStreamEvent(
         operationType: String = "insert",
-        event: TransactionEvent<*> = createSampleEventStoreEvent(),
+        event: TransactionEvent<*>,
     ): ChangeStreamEvent<TransactionEvent<*>> {
         val document = toDocument(event)
         val mockEvent = mock<ChangeStreamEvent<TransactionEvent<Any>>>()
