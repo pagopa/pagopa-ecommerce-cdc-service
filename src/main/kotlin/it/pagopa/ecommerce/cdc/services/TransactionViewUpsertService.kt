@@ -33,39 +33,38 @@ class TransactionViewUpsertService(
      * @param event The MongoDB change stream event document
      * @return Mono<Void> Completes when the upsert operation succeeds
      */
-    fun upsertEventData(transactionId: String, event: TransactionEvent<*>): Mono<Unit> {
+    fun upsertEventData(event: TransactionEvent<*>): Mono<Unit> {
+        val eventCode = event.eventCode
+        val transactionId = event.transactionId
         return Mono.defer {
-            val eventCode = event.eventCode
-
-            logger.debug(
-                "Upserting transaction view data for _id: [{}], eventCode: [{}]",
-                transactionId,
-                eventCode,
-            )
-
-            val query = Query.query(Criteria.where("transactionId").`is`(transactionId))
-            val update = buildUpdateFromEvent(event)
-            Mono.justOrEmpty(update)
-                .flatMap { updateDefinition ->
-                    mongoTemplate.upsert(
-                        query,
-                        updateDefinition!!,
-                        BaseTransactionView::class.java,
-                        transactionViewName,
-                    )
-                }
-                .doOnNext { updateResult ->
-                    logger.debug(
-                        "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
-                        transactionId,
-                        eventCode,
-                        updateResult.matchedCount,
-                        updateResult.modifiedCount,
-                        updateResult.upsertedId != null,
-                    )
-                }
-                .thenReturn(Unit)
-        }
+                logger.debug(
+                    "Upserting transaction view data for _id: [{}], eventCode: [{}]",
+                    transactionId,
+                    eventCode,
+                )
+                val query = Query.query(Criteria.where("transactionId").`is`(transactionId))
+                val update = buildUpdateFromEvent(event)
+                Mono.justOrEmpty(update)
+                    .flatMap { updateDefinition ->
+                        mongoTemplate.upsert(
+                            query,
+                            updateDefinition!!,
+                            BaseTransactionView::class.java,
+                            transactionViewName,
+                        )
+                    }
+                    .doOnNext { updateResult ->
+                        logger.debug(
+                            "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
+                            transactionId,
+                            eventCode,
+                            updateResult.matchedCount,
+                            updateResult.modifiedCount,
+                            updateResult.upsertedId != null,
+                        )
+                    }
+                    .thenReturn(Unit)
+            }
             .doOnSuccess { _ ->
                 logger.info("Successfully upserted transaction view for _id: [{}]", transactionId)
             }
