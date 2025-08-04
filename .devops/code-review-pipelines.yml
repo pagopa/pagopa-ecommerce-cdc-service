@@ -13,7 +13,7 @@ resources:
     - repository: pagopaEcommerceLocal
       type: github
       name: pagopa/pagopa-ecommerce-local
-      ref: CHK-4352-add-cdc-view-config
+      ref: CHK-4375-add-cdc-tests
       endpoint: 'io-azure-devops-github-ro'
 
 stages:
@@ -100,16 +100,64 @@ stages:
               echo "##[debug] Change placeholder for ecommerce-cdc-service set branch: $(BRANCH_NAME)"
               sed -i "s/^ECOMMERCE_CDC_COMMIT_SHA=.*$/ECOMMERCE_CDC_COMMIT_SHA=$(BRANCH_NAME)/" .env
             displayName: 'Change ecommerce-cdc-service branch name ecommerce-local .env'
-          - script: docker compose up pagopa-ecommerce-cdc-service mongo mongo-init redis -d
-            displayName: 'Run app with docker-compose'
-            continueOnError: true
+          - script: |
+              # Create temporary override file for CDC test configuration
+              cat > docker-compose.cdc-override.yml << 'EOF'
+              services:
+                pagopa-ecommerce-transactions-service:
+                  environment:
+                    - TRANSACTIONSVIEW_UPDATE_ENABLED=false
+                pagopa-ecommerce-event-dispatcher-service:
+                  environment:
+                    - TRANSACTIONSVIEW_UPDATE_ENABLED=false
+              EOF
+              echo "Created CDC test override file"
+            displayName: 'Create CDC test configuration override'
+          - script: docker compose -f docker-compose.yml -f docker-compose.cdc-override.yml up pagopa-ecommerce-cdc-service pagopa-ecommerce-transactions-service pagopa-ecommerce-event-dispatcher-service pagopa-ecommerce-payment-methods-service mongo mongo-init redis storage traefik pagopa-jwt-issuer-mock pagopa-node-mock pagopa-pdv-mock -d
+            displayName: 'Start all services with CDC test configuration'
+          - script: |
+              echo "Verifying TRANSACTIONSVIEW_UPDATE_ENABLED environment variable override..."
+              echo "Checking transactions-service container:"
+              docker exec pagopa-ecommerce-transactions-service env | grep TRANSACTIONSVIEW_UPDATE_ENABLED || echo "TRANSACTIONSVIEW_UPDATE_ENABLED not found in transactions-service"
+              echo "Checking event-dispatcher-service container:"
+              docker exec pagopa-ecommerce-event-dispatcher-service env | grep TRANSACTIONSVIEW_UPDATE_ENABLED || echo "TRANSACTIONSVIEW_UPDATE_ENABLED not found in event-dispatcher-service"
+              
+              # Verify the setting is actually false for both services
+              TRANS_VAR=$(docker exec pagopa-ecommerce-transactions-service env | grep TRANSACTIONSVIEW_UPDATE_ENABLED | cut -d'=' -f2)
+              DISP_VAR=$(docker exec pagopa-ecommerce-event-dispatcher-service env | grep TRANSACTIONSVIEW_UPDATE_ENABLED | cut -d'=' -f2)
+              
+              if [[ "$TRANS_VAR" == "false" && "$DISP_VAR" == "false" ]]; then
+                echo "✅ Environment variable override successful - both services have TRANSACTIONSVIEW_UPDATE_ENABLED=false"
+              else
+                echo "❌ Environment variable override failed:"
+                echo "  transactions-service: TRANSACTIONSVIEW_UPDATE_ENABLED=$TRANS_VAR (expected: false)"
+                echo "  event-dispatcher-service: TRANSACTIONSVIEW_UPDATE_ENABLED=$DISP_VAR (expected: false)"
+                exit 1
+              fi
+            displayName: 'Verify CDC test isolation - environment variable override'
           - script: |
               timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:8099/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
-            displayName: 'Health check ecommerce-cdc-service'
-          # TODO add this task back with full integration tests implementation
-#          - task: PublishTestResults@2
-#            inputs:
-#              testResultsFormat: 'JUnit'
-#              testResultsFiles: '**/*-TEST.xml'
-#              searchFolder: '$(System.DefaultWorkingDirectory)'
-#            displayName: 'Publish Integration Test Results'
+            displayName: 'Health check CDC service'
+          - script: |
+              timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:8080/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
+            displayName: 'Health check transactions service'  
+          - script: |
+              timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:9000/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
+            displayName: 'Health check event dispatcher service'
+          - script: |
+              timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:8083/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
+            displayName: 'Health check payment methods service'
+          - script: yarn global add newman
+            displayName: 'newman installation'
+          - script: |
+              newman run api-tests/cdc-service/cdc-service_ecommerce_local.postman_collection.json \
+                --environment=api-tests/cdc-service/cdc-service_ecommerce_local.postman_environment.json \
+                --reporters cli,junit \
+                --reporter-junit-export Results/cdc-api-test.xml
+            displayName: 'Run CDC Service API Tests'
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: '**/*-TEST.xml'
+              searchFolder: '$(System.DefaultWorkingDirectory)'
+            displayName: 'Publish Integration Test Results'
