@@ -10,7 +10,6 @@ import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createMoc
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createMockChangeStreamEventWithNullDocument
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
-import it.pagopa.ecommerce.commons.v2.TransactionTestUtils
 import java.time.Duration
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -74,11 +73,9 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         given(ecommerceCDCEventDispatcherService.dispatchEvent(any())).willReturn(Mono.just(event))
 
-        val activatedEvent = TransactionTestUtils.transactionActivateEvent()
+        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
-        StepVerifier.create(ecommerceCDCEventDispatcherService.dispatchEvent(activatedEvent))
-            .expectNext(event)
-            .verifyComplete()
+        StepVerifier.create(result).expectNext(event).verifyComplete()
 
         verify(cdcLockService).acquireEventLock(any())
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(event)
@@ -116,7 +113,6 @@ class EcommerceTransactionsLogEventsStreamTest {
                 eq(TransactionEvent::class.java),
             )
         verify(cdcLockService).acquireEventLock(any())
-
         verify(ecommerceCDCEventDispatcherService)
             .dispatchEvent(
                 argThat { dispatchedEvent ->
@@ -173,7 +169,6 @@ class EcommerceTransactionsLogEventsStreamTest {
         StepVerifier.create(result).verifyComplete()
 
         verify(cdcLockService).acquireEventLock(any())
-
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(event)
     }
 
@@ -196,6 +191,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 )
             )
             .willReturn(Flux.just(changeStreamEvent1, changeStreamEvent2))
+
         given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
         given(ecommerceCDCEventDispatcherService.dispatchEvent(event1))
