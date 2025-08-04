@@ -7,6 +7,8 @@ import it.pagopa.ecommerce.commons.documents.v2.authorization.RedirectTransactio
 import it.pagopa.ecommerce.commons.generated.npg.v1.dto.OperationResultDto
 import it.pagopa.ecommerce.commons.generated.server.model.TransactionStatusDto
 import it.pagopa.ecommerce.commons.v2.TransactionTestUtils
+import org.bson.BsonString
+import org.bson.BsonValue
 import java.time.ZonedDateTime
 import java.util.stream.Stream
 import kotlin.test.assertEquals
@@ -18,6 +20,9 @@ import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.kotlin.*
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
+import org.springframework.data.mongodb.core.query.Criteria
+import org.springframework.data.mongodb.core.query.Query
+import org.springframework.data.mongodb.core.updateFirst
 import org.springframework.http.HttpStatus
 import reactor.core.publisher.Mono
 import reactor.test.StepVerifier
@@ -98,15 +103,39 @@ class TransactionViewUpsertServiceTest {
             TransactionTestUtils.transactionActivateEvent(
                 TransactionTestUtils.npgTransactionGatewayActivationData()
             )
-        given(mongoTemplate.upsert(any(), any(), any(), any()))
-            .willReturn(Mono.just(UpdateResult.acknowledged(1L, 1L, null)))
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(
+                                ZonedDateTime.parse(event.creationDate)
+                                    .toInstant()
+                                    .toEpochMilli()
+                            ),
+                    )
+            )
+
+        given(mongoTemplate.updateFirst(any(), any(), any(), any()))
+            .willReturn(Mono.just(UpdateResult.acknowledged(0L, 0L, null)))
+
+        given(mongoTemplate.upsert(eq(queryByTransactionAndLastProcessedEventAtCondition), any(), any(), any()))
+            .willReturn(Mono.just(UpdateResult.acknowledged(0L, 0L, null)))
+
+        given(mongoTemplate.upsert(eq(queryByTransactionId), any(), any(), any()))
+            .willReturn(Mono.just(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId))))
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
             .expectNext(Unit)
             .verifyComplete()
 
         // verifications
-        verify(mongoTemplate, times(1))
+        verify(mongoTemplate, times(2))
             .upsert(
                 argThat { query ->
                     assertEquals(
