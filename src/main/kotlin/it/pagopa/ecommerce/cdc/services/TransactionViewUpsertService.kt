@@ -1,6 +1,5 @@
 package it.pagopa.ecommerce.cdc.services
 
-import com.mongodb.client.result.UpdateResult
 import it.pagopa.ecommerce.cdc.exceptions.CdcEventTypeException
 import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
 import it.pagopa.ecommerce.commons.documents.BaseTransactionView
@@ -55,41 +54,51 @@ class TransactionViewUpsertService(
                     Query.query(Criteria.where("transactionId").`is`(transactionId))
 
                 val queryByTransactionAndLastProcessedEventAtCondition =
-                    Query.query(Criteria.where("transactionId").`is`(transactionId)
-                        .orOperator(
-                            Criteria.where("lastProcessedEventAt")
-                                .exists(false),
-                                    Criteria.where("lastProcessedEventAt")
-                                        .lt(
-                                            ZonedDateTime.parse(event.creationDate)
-                                                .toInstant()
-                                                .toEpochMilli()
-                                        )
-                                )
-                        )
+                    Query.query(
+                        Criteria.where("transactionId")
+                            .`is`(transactionId)
+                            .orOperator(
+                                Criteria.where("lastProcessedEventAt").exists(false),
+                                Criteria.where("lastProcessedEventAt")
+                                    .lt(
+                                        ZonedDateTime.parse(event.creationDate)
+                                            .toInstant()
+                                            .toEpochMilli()
+                                    ),
+                            )
+                    )
 
-            buildUpdateFromEvent(event)
+                buildUpdateFromEvent(event)
                     .flatMap { (update, updateStatus) ->
                         mongoTemplate
                             .updateFirst(
                                 queryByTransactionAndLastProcessedEventAtCondition,
-                                updateStatus!!,
+                                updateStatus,
                                 BaseTransactionView::class.java,
                                 transactionViewName,
                             )
-                            .filter { it ->
-                                it.matchedCount > 0
-                            }.switchIfEmpty(
+                            .filter { it -> it.matchedCount > 0 }
+                            .switchIfEmpty(
                                 Mono.justOrEmpty(update)
                                     .flatMap { upd ->
-                                            logger.info(upd.toString());
-                                            mongoTemplate.upsert(
-                                                queryByTransactionId,
-                                                upd!!,
+                                        logger.info(upd.toString())
+                                        mongoTemplate.upsert(
+                                            queryByTransactionId,
+                                            upd!!,
+                                            BaseTransactionView::class.java,
+                                            transactionViewName,
+                                        )
+                                    }
+                                    .switchIfEmpty(
+                                        mongoTemplate
+                                            .upsert(
+                                                queryByTransactionAndLastProcessedEventAtCondition,
+                                                updateStatus,
                                                 BaseTransactionView::class.java,
                                                 transactionViewName,
                                             )
-                                    }
+                                            .filter { it -> it.upsertedId != null }
+                                    )
                                     .switchIfEmpty(
                                         Mono.error {
                                             CdcQueryMatchException(
@@ -179,7 +188,6 @@ class TransactionViewUpsertService(
         val update = Update()
         val statusUpdate = Update()
         val data = event.data
-        val update = Update()
         update["email"] = data.email.opaqueData
         update["paymentNotices"] = data.paymentNotices
         update["clientId"] = data.clientId
@@ -234,7 +242,6 @@ class TransactionViewUpsertService(
         val update = Update()
         val statusUpdate = Update()
         val data = event.data
-        val update = Update()
         update["rrn"] = data.rrn
         update["authorizationCode"] = data.authorizationCode
         statusUpdate["rrn"] = data.rrn
@@ -348,9 +355,7 @@ class TransactionViewUpsertService(
     }
 
     /** Updates fields for TRANSACTION_USER_CANCELED_EVENT. Adds cancellation timestamp. */
-    private fun updateUserCanceledData(
-        event: TransactionUserCanceledEvent
-    ): Pair<Update?, Update> {
+    private fun updateUserCanceledData(event: TransactionUserCanceledEvent): Pair<Update?, Update> {
         val statusUpdate = Update()
         statusUpdate["status"] = TransactionStatusDto.CANCELLATION_REQUESTED
         statusUpdate["lastProcessedEventAt"] =
@@ -368,9 +373,7 @@ class TransactionViewUpsertService(
     }
 
     /** Updates fields for TRANSACTION_CLOSURE_ERROR_EVENT. Adds closure error timestamp. */
-    private fun updateClosureErrorData(
-        event: TransactionClosureErrorEvent
-    ): Pair<Update?, Update> {
+    private fun updateClosureErrorData(event: TransactionClosureErrorEvent): Pair<Update?, Update> {
         val statusUpdate = Update()
         statusUpdate["closureErrorData"] = event.data
         statusUpdate["status"] = TransactionStatusDto.CLOSURE_ERROR
