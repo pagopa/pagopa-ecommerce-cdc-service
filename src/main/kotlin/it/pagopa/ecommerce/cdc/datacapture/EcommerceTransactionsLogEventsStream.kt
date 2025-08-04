@@ -87,7 +87,7 @@ class EcommerceTransactionsLogEventsStream(
                             TransactionEvent::class.java,
                         )
                         // Process the elements of the Flux
-                        .flatMap { processEvent(it.body!!) }
+                        .flatMap { processEvent(it.body) }
                         // Save resume token every n emitted elements
                         .index { changeEventFluxIndex, changeEventDocument ->
                             Pair(changeEventFluxIndex, changeEventDocument)
@@ -118,9 +118,9 @@ class EcommerceTransactionsLogEventsStream(
      * Processes individual change stream events. Currently delegates to the CDC event dispatcher
      * service for logging.
      */
-    private fun processEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> {
+    private fun processEvent(event: TransactionEvent<*>?): Mono<TransactionEvent<*>> {
         return Mono.defer {
-                event.let { event ->
+                event?.let { event ->
                     cdcLockService
                         .acquireEventLock(event.id)
                         .filter { it == true }

@@ -179,6 +179,7 @@ class TransactionViewUpsertService(
         val update = Update()
         val statusUpdate = Update()
         val data = event.data
+        val update = Update()
         update["email"] = data.email.opaqueData
         update["paymentNotices"] = data.paymentNotices
         update["clientId"] = data.clientId
@@ -233,7 +234,7 @@ class TransactionViewUpsertService(
         val update = Update()
         val statusUpdate = Update()
         val data = event.data
-
+        val update = Update()
         update["rrn"] = data.rrn
         update["authorizationCode"] = data.authorizationCode
         statusUpdate["rrn"] = data.rrn
@@ -243,14 +244,14 @@ class TransactionViewUpsertService(
 
         when (gatewayAuthData) {
             is NpgTransactionGatewayAuthorizationData -> {
-                update["gatewayAuthorizationStatus"] = gatewayAuthData.operationResult
+                update["gatewayAuthorizationStatus"] = gatewayAuthData.operationResult.toString()
                 update["authorizationErrorCode"] = gatewayAuthData.errorCode
                 statusUpdate["gatewayAuthorizationStatus"] = gatewayAuthData.operationResult
                 statusUpdate["authorizationErrorCode"] = gatewayAuthData.errorCode
             }
 
             is RedirectTransactionGatewayAuthorizationData -> {
-                update["gatewayAuthorizationStatus"] = gatewayAuthData.outcome
+                update["gatewayAuthorizationStatus"] = gatewayAuthData.outcome.toString()
                 update["authorizationErrorCode"] = gatewayAuthData.errorCode
                 statusUpdate["gatewayAuthorizationStatus"] = gatewayAuthData.outcome
                 statusUpdate["authorizationErrorCode"] = gatewayAuthData.errorCode
