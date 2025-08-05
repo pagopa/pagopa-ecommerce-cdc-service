@@ -74,16 +74,16 @@ class TransactionViewUpsertService(
                                 updateStatus,
                                 update,
                             )
-
-                            .switchIfEmpty( //insert
-                                mongoTemplate.upsert(
-                                    queryByTransactionAndLastProcessedEventAtCondition,
-                                    updateStatus,
-                                    BaseTransactionView::class.java,
-                                    transactionViewName,
-                                ).filter { updateResult -> updateResult.upsertedId != null }
+                            .switchIfEmpty( // insert
+                                mongoTemplate
+                                    .upsert(
+                                        queryByTransactionAndLastProcessedEventAtCondition,
+                                        updateStatus,
+                                        BaseTransactionView::class.java,
+                                        transactionViewName,
+                                    )
+                                    .filter { updateResult -> updateResult.upsertedId != null }
                             )
-
                     }
                     .switchIfEmpty(
                         Mono.error {
@@ -138,14 +138,22 @@ class TransactionViewUpsertService(
     ): Mono<UpdateResult> {
         return when (update) {
             null ->
-                mongoTemplate.exists(queryByTransactionId,
-                    BaseTransactionView::class.java, transactionViewName).flatMap {
-                        mongoTemplate.updateFirst(
-                    queryByTransactionAndLastProcessedEventAtCondition,
-                    updateStatus,
-                    BaseTransactionView::class.java,
-                    transactionViewName,
-                ).filter { updateResult -> it || updateResult.modifiedCount > 0} }
+                mongoTemplate
+                    .exists(
+                        queryByTransactionId,
+                        BaseTransactionView::class.java,
+                        transactionViewName,
+                    )
+                    .flatMap {
+                        mongoTemplate
+                            .updateFirst(
+                                queryByTransactionAndLastProcessedEventAtCondition,
+                                updateStatus,
+                                BaseTransactionView::class.java,
+                                transactionViewName,
+                            )
+                            .filter { updateResult -> it || updateResult.modifiedCount > 0 }
+                    }
             else ->
                 mongoTemplate
                     .updateFirst(
@@ -162,7 +170,8 @@ class TransactionViewUpsertService(
                             BaseTransactionView::class.java,
                             transactionViewName,
                         )
-                    ).filter { updateResult -> updateResult.modifiedCount > 0 }
+                    )
+                    .filter { updateResult -> updateResult.modifiedCount > 0 }
         }
     }
 
