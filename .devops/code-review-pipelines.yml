@@ -100,20 +100,24 @@ stages:
               echo "##[debug] Change placeholder for ecommerce-cdc-service set branch: $(BRANCH_NAME)"
               sed -i "s/^ECOMMERCE_CDC_COMMIT_SHA=.*$/ECOMMERCE_CDC_COMMIT_SHA=$(BRANCH_NAME)/" .env
             displayName: 'Change ecommerce-cdc-service branch name ecommerce-local .env'
+#          - script: |
+#              # Create temporary override file for CDC test configuration
+#              cat > docker-compose.cdc-override.yml << 'EOF'
+#              services:
+#                pagopa-ecommerce-transactions-service:
+#                  environment:
+#                    - TRANSACTIONSVIEW_UPDATE_ENABLED=false
+#                pagopa-ecommerce-event-dispatcher-service:
+#                  environment:
+#                    - TRANSACTIONSVIEW_UPDATE_ENABLED=false
+#              EOF
+#              echo "Created CDC override file"
+#            displayName: 'Create CDC test configuration override'
           - script: |
-              # Create temporary override file for CDC test configuration
-              cat > docker-compose.cdc-override.yml << 'EOF'
-              services:
-                pagopa-ecommerce-transactions-service:
-                  environment:
-                    - TRANSACTIONSVIEW_UPDATE_ENABLED=false
-                pagopa-ecommerce-event-dispatcher-service:
-                  environment:
-                    - TRANSACTIONSVIEW_UPDATE_ENABLED=false
-              EOF
-              echo "Created CDC test override file"
-            displayName: 'Create CDC test configuration override'
-          - script: docker compose -f docker-compose.yml -f docker-compose.cdc-override.yml up pagopa-ecommerce-cdc-service pagopa-ecommerce-transactions-service pagopa-ecommerce-event-dispatcher-service pagopa-ecommerce-payment-methods-service mongo mongo-init redis storage traefik pagopa-jwt-issuer-mock pagopa-node-mock pagopa-pdv-mock -d
+              TRANSACTIONSVIEW_UPDATE_ENABLED=false docker compose up \
+              pagopa-ecommerce-cdc-service pagopa-ecommerce-transactions-service \
+              pagopa-ecommerce-event-dispatcher-service pagopa-ecommerce-payment-methods-service \
+              mongo mongo-init redis storage traefik pagopa-jwt-issuer-mock pagopa-node-mock pagopa-pdv-mock -d
             displayName: 'Start all services with CDC test configuration'
           - script: |
               echo "Verifying TRANSACTIONSVIEW_UPDATE_ENABLED environment variable override..."
