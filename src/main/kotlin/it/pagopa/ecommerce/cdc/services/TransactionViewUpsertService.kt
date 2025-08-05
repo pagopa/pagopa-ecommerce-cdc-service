@@ -15,6 +15,7 @@ import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Update
+import org.springframework.data.mongodb.core.updateFirst
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
 
@@ -67,43 +68,44 @@ class TransactionViewUpsertService(
 
                 buildUpdateFromEvent(event)
                     .flatMap { (update, updateStatus) ->
-                        mongoTemplate
-                            .updateFirst(
-                                queryByTransactionAndLastProcessedEventAtCondition,
-                                updateStatus,
-                                BaseTransactionView::class.java,
-                                transactionViewName,
-                            )
-                            .filter { it -> it.matchedCount > 0 }
-                            .switchIfEmpty(
-                                Mono.justOrEmpty(update)
-                                    .flatMap { upd ->
-                                        logger.info(upd.toString())
-                                        mongoTemplate.upsert(
-                                            queryByTransactionId,
-                                            upd!!,
+                        mongoTemplate.exists(queryByTransactionId, transactionViewName).flatMap {
+                            when (it) {
+                                true ->
+                                    mongoTemplate
+                                        .updateFirst(
+                                            queryByTransactionAndLastProcessedEventAtCondition,
+                                            updateStatus,
                                             BaseTransactionView::class.java,
                                             transactionViewName,
                                         )
-                                    }
-                                    .switchIfEmpty(
-                                        mongoTemplate
-                                            .upsert(
-                                                queryByTransactionAndLastProcessedEventAtCondition,
-                                                updateStatus,
-                                                BaseTransactionView::class.java,
-                                                transactionViewName,
-                                            )
-                                            .filter { it -> it.upsertedId != null }
+                                        .filter { updateResult -> updateResult.modifiedCount > 0 }
+                                        .switchIfEmpty(
+                                            Mono.justOrEmpty(update)
+                                                .switchIfEmpty(
+                                                    Mono.error {
+                                                        CdcQueryMatchException(
+                                                            "Query didn't match any condition to update the view"
+                                                        )
+                                                    }
+                                                )
+                                                .flatMap { update ->
+                                                    mongoTemplate.updateFirst(
+                                                        queryByTransactionId,
+                                                        update!!,
+                                                        BaseTransactionView::class.java,
+                                                        transactionViewName,
+                                                    )
+                                                }
+                                        )
+                                false ->
+                                    mongoTemplate.upsert(
+                                        queryByTransactionId,
+                                        updateStatus,
+                                        BaseTransactionView::class.java,
+                                        transactionViewName,
                                     )
-                                    .switchIfEmpty(
-                                        Mono.error {
-                                            CdcQueryMatchException(
-                                                "Query didn't match any condition to update the view"
-                                            )
-                                        }
-                                    )
-                            )
+                            }
+                        }
                     }
                     .doOnNext { updateResult ->
                         logger.debug(
