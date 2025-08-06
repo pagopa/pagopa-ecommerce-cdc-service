@@ -32,12 +32,18 @@ class TransactionViewUpsertService(
     private val logger = LoggerFactory.getLogger(TransactionViewUpsertService::class.java)
 
     /**
-     * Performs an upsert operation for transaction view data based on the event content. Uses a
-     * single atomic upsert operation without additional database reads for optimal performance.
+     * Processes a transaction event and updates the corresponding view with conditional logic. The
+     * operation uses timestamp-based event ordering to ensure only newer events modify the view. If
+     * no existing document is modified, performs an upsert for new transactions.
      *
-     * @param transactionId The transaction identifier
-     * @param event The MongoDB change stream event document
-     * @return Mono<Void> Completes when the upsert operation succeeds
+     * The process involves:
+     * 1. Building update operations based on the specific event type
+     * 2. Attempting conditional update with timestamp validation (lastProcessedEventAt)
+     * 3. Falling back to upsert when no modification occurs for new transactions
+     * 4. Throwing CdcQueryMatchException if no update conditions are met
+     *
+     * @param event The transaction event containing update data and metadata
+     * @return Mono<UpdateResult> The result of the update/upsert operation
      */
     fun upsertEventData(event: TransactionEvent<*>): Mono<UpdateResult> {
         val eventCode = event.eventCode
@@ -218,7 +224,7 @@ class TransactionViewUpsertService(
         update["clientId"] = data.clientId
         update["creationDate"] = event.creationDate
         update["_class"] = Transaction::class.java.canonicalName
-      
+
         statusUpdate["email"] = data.email.opaqueData
         statusUpdate["paymentNotices"] = data.paymentNotices
         statusUpdate["clientId"] = data.clientId
@@ -289,7 +295,6 @@ class TransactionViewUpsertService(
 
                 statusUpdate["gatewayAuthorizationStatus"] = gatewayAuthData.outcome
                 statusUpdate["authorizationErrorCode"] = gatewayAuthData.errorCode
-
             }
 
             else ->
@@ -304,7 +309,6 @@ class TransactionViewUpsertService(
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
 
         return Pair(update, statusUpdate)
-
     }
 
     /**

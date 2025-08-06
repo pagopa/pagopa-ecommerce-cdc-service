@@ -11,10 +11,10 @@ import reactor.core.publisher.Mono
 
 /**
  * Service responsible for managing distributed locking mechanisms for CDC event processing.
- * 
- * Uses Redis-based distributed locks to prevent concurrent processing of the same event
- * across multiple CDC service instances, ensuring data consistency and avoiding duplicate
- * processing of transaction events.
+ *
+ * Uses Redis-based distributed locks to prevent concurrent processing of the same event across
+ * multiple CDC service instances, ensuring data consistency and avoiding duplicate processing of
+ * transaction events.
  */
 @Service
 class CdcLockService(

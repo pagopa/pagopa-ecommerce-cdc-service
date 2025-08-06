@@ -64,7 +64,7 @@ class EcommerceCDCEventDispatcherService(
 
     /**
      * Processes the transaction event by performing upsert operations on the transaction view.
-     * Updates event payload data using conditional logic based on timestamps and logs detailed 
+     * Updates event payload data using conditional logic based on timestamps and logs detailed
      * event information for monitoring and debugging purposes.
      *
      * @param event The transaction event to process
