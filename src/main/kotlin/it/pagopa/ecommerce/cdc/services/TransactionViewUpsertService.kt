@@ -218,7 +218,7 @@ class TransactionViewUpsertService(
         update["clientId"] = data.clientId
         update["creationDate"] = event.creationDate
         update["_class"] = Transaction::class.java.canonicalName
-
+      
         statusUpdate["email"] = data.email.opaqueData
         statusUpdate["paymentNotices"] = data.paymentNotices
         statusUpdate["clientId"] = data.clientId
@@ -278,6 +278,7 @@ class TransactionViewUpsertService(
             is NpgTransactionGatewayAuthorizationData -> {
                 update["gatewayAuthorizationStatus"] = gatewayAuthData.operationResult.toString()
                 update["authorizationErrorCode"] = gatewayAuthData.errorCode
+
                 statusUpdate["gatewayAuthorizationStatus"] = gatewayAuthData.operationResult
                 statusUpdate["authorizationErrorCode"] = gatewayAuthData.errorCode
             }
@@ -285,8 +286,10 @@ class TransactionViewUpsertService(
             is RedirectTransactionGatewayAuthorizationData -> {
                 update["gatewayAuthorizationStatus"] = gatewayAuthData.outcome.toString()
                 update["authorizationErrorCode"] = gatewayAuthData.errorCode
+
                 statusUpdate["gatewayAuthorizationStatus"] = gatewayAuthData.outcome
                 statusUpdate["authorizationErrorCode"] = gatewayAuthData.errorCode
+
             }
 
             else ->
@@ -301,6 +304,7 @@ class TransactionViewUpsertService(
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
 
         return Pair(update, statusUpdate)
+
     }
 
     /**
