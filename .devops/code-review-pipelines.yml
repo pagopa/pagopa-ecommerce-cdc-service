@@ -101,25 +101,11 @@ stages:
               sed -i "s/^ECOMMERCE_CDC_COMMIT_SHA=.*$/ECOMMERCE_CDC_COMMIT_SHA=$(BRANCH_NAME)/" .env
             displayName: 'Change ecommerce-cdc-service branch name ecommerce-local .env'
           - script: |
-              # Override properties to enable transaction view write by CDC service
-              # disabling online write operation
               echo "Overriding environment files to enable async view update"
               sed -i "s/^TRANSACTIONSVIEW_UPDATE_ENABLED=.*$/TRANSACTIONSVIEW_UPDATE_ENABLED=false/" ./pagopa-ecommerce-transactions-service/transactions-service.env
               sed -i "s/^TRANSACTIONSVIEW_UPDATE_ENABLED=.*$/TRANSACTIONSVIEW_UPDATE_ENABLED=false/" ./pagopa-ecommerce-event-dispatcher-service/event-dispatcher-service.env
               sed -i "s/^TRANSACTIONSVIEW_UPDATE_ENABLED=.*$/TRANSACTIONSVIEW_UPDATE_ENABLED=false/" ./pagopa-ecommerce-transactions-scheduler-service/transactions-scheduler-service.env
               sed -i "s/^ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME=.*$/ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME=transactions-view/" ./pagopa-ecommerce-cdc-service/ecommerce-cdc-service.env
-              printf "\npagopa-ecommerce-transactions-service env file START\n"
-              cat ./pagopa-ecommerce-transactions-service/transactions-service.env
-              printf "\npagopa-ecommerce-transactions-service env file END\n"
-              printf "\npagopa-ecommerce-event-dispatcher-service env file START\n"
-              cat ./pagopa-ecommerce-event-dispatcher-service/event-dispatcher-service.env
-              printf "\npagopa-ecommerce-event-dispatcher-service env file END\n"
-              printf "\npagopa-ecommerce-transactions-scheduler-service env file START\n"
-              cat ./pagopa-ecommerce-transactions-scheduler-service/transactions-scheduler-service.env
-              printf "\npagopa-ecommerce-transactions-scheduler-service env file END\n"
-              printf "\npagopa-ecommerce-cdc-service env file START\n"
-              cat ./pagopa-ecommerce-cdc-service/ecommerce-cdc-service.env
-              printf "\npagopa-ecommerce-cdc-service env file END\n"
             displayName: 'Override environment files to enable async view update'
           - script: |
               docker compose up \
