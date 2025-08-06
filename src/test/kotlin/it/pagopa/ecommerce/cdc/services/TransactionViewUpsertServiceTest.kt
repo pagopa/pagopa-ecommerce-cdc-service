@@ -521,13 +521,13 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
 
         // test
@@ -570,7 +570,6 @@ class TransactionViewUpsertServiceTest {
         verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
 
         verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
-
     }
 
     @ParameterizedTest
@@ -596,24 +595,18 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionId),
-                any(),
-                any(),
-                any(),
-            )
-        )
-            .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
+        given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
+            mono { UpdateResult.acknowledged(1L, 1L, null) }
+        }
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -647,32 +640,33 @@ class TransactionViewUpsertServiceTest {
                     true
                 },
                 eq(BaseTransactionView::class.java),
-                eq(collectionName)
+                eq(collectionName),
             )
 
-        verify(mongoTemplate, times(1)).updateFirst(eq(queryByTransactionId),
-            argThat { update ->
-                val setDocument = update.updateObject[$$"$set"] as Document
-                assertEquals(event.data.rrn, setDocument["rrn"])
-                assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
-                assertEquals(
-                    expectedAuthorizationStatus,
-                    setDocument["gatewayAuthorizationStatus"].toString(),
-                )
-                assertEquals(
-                    expectedAuthorizationErrorCode,
-                    setDocument["authorizationErrorCode"],
-                )
-                true
-            },
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionId),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(event.data.rrn, setDocument["rrn"])
+                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    assertEquals(
+                        expectedAuthorizationStatus,
+                        setDocument["gatewayAuthorizationStatus"].toString(),
+                    )
+                    assertEquals(
+                        expectedAuthorizationErrorCode,
+                        setDocument["authorizationErrorCode"],
+                    )
+                    true
+                },
                 eq(BaseTransactionView::class.java),
-                eq(collectionName)
-        )
+                eq(collectionName),
+            )
 
         verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
 
         verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
-
     }
 
     @ParameterizedTest
@@ -698,33 +692,27 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionId),
-                any(),
-                any(),
-                any(),
-            )
-        )
-            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+        given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
+            mono { UpdateResult.acknowledged(0L, 0L, null) }
+        }
 
         given(
-            mongoTemplate.upsert(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer {
                 mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
             }
@@ -764,54 +752,60 @@ class TransactionViewUpsertServiceTest {
                     true
                 },
                 eq(BaseTransactionView::class.java),
-                eq(collectionName)
+                eq(collectionName),
             )
 
-        verify(mongoTemplate, times(1)).updateFirst(eq(queryByTransactionId),
-            argThat { update ->
-                val setDocument = update.updateObject[$$"$set"] as Document
-                assertEquals(event.data.rrn, setDocument["rrn"])
-                assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
-                assertEquals(
-                    expectedAuthorizationStatus,
-                    setDocument["gatewayAuthorizationStatus"].toString(),
-                )
-                assertEquals(
-                    expectedAuthorizationErrorCode,
-                    setDocument["authorizationErrorCode"],
-                )
-                true
-            },
-            eq(BaseTransactionView::class.java),
-            eq(collectionName)
-        )
-
-        verify(mongoTemplate, times(1)).exists(eq(queryByTransactionId),
-            eq(BaseTransactionView::class.java),
-            eq(collectionName))
-
-        verify(mongoTemplate, times(1)).upsert(eq(queryByTransactionAndLastProcessedEventAtCondition),
-            argThat { update ->
-                val setDocument = update.updateObject[$$"$set"] as Document
-                assertEquals(event.data.rrn, setDocument["rrn"])
-                assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
-                assertEquals(
-                    expectedAuthorizationStatus,
-                    setDocument["gatewayAuthorizationStatus"].toString(),
-                )
-                assertEquals(
-                    expectedAuthorizationErrorCode,
-                    setDocument["authorizationErrorCode"],
-                )
-                true
-            },
-            eq(BaseTransactionView::class.java),
-            eq(collectionName)
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionId),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(event.data.rrn, setDocument["rrn"])
+                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    assertEquals(
+                        expectedAuthorizationStatus,
+                        setDocument["gatewayAuthorizationStatus"].toString(),
+                    )
+                    assertEquals(
+                        expectedAuthorizationErrorCode,
+                        setDocument["authorizationErrorCode"],
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
             )
 
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(event.data.rrn, setDocument["rrn"])
+                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    assertEquals(
+                        expectedAuthorizationStatus,
+                        setDocument["gatewayAuthorizationStatus"].toString(),
+                    )
+                    assertEquals(
+                        expectedAuthorizationErrorCode,
+                        setDocument["authorizationErrorCode"],
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
     }
 
-    //CLOSED
+    // CLOSED
     @Test
     fun `should perform upsert operation gathering data from transaction closed event with OK Node outcome when transaction view is already present with lastProcessedEventAt timestamp before event creationDate`() {
         // pre-conditions
@@ -831,15 +825,14 @@ class TransactionViewUpsertServiceTest {
                     )
             )
 
-
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
 
         // test
@@ -853,10 +846,7 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.CLOSED,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.CLOSED, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
@@ -877,13 +867,15 @@ class TransactionViewUpsertServiceTest {
         verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
 
         verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
-
     }
 
     @Test
     fun `should perform upsert operation gathering data from transaction closed canceled event with OK Node outcome when transaction view is already present with lastProcessedEventAt timestamp before event creationDate`() {
         // pre-conditions
-        val event = TransactionTestUtils.transactionClosedEventCanceledByUser(TransactionClosureData.Outcome.OK)
+        val event =
+            TransactionTestUtils.transactionClosedEventCanceledByUser(
+                TransactionClosureData.Outcome.OK
+            )
 
         val queryByTransactionId =
             Query.query(Criteria.where("transactionId").`is`(event.transactionId))
@@ -899,15 +891,14 @@ class TransactionViewUpsertServiceTest {
                     )
             )
 
-
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
 
         // test
@@ -921,10 +912,7 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.CANCELED,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.CANCELED, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
@@ -945,9 +933,7 @@ class TransactionViewUpsertServiceTest {
         verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
 
         verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
-
     }
-
 
     @Test
     fun `should perform upsert operation gathering data from transaction closed event with OK Node outcome when transaction view doesn't exist`() {
@@ -968,36 +954,31 @@ class TransactionViewUpsertServiceTest {
                     )
             )
 
-
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(
-            mongoTemplate.exists(
-                eq(queryByTransactionId),
-                any(),
-                any()
-            )
-        )
-            .willAnswer { mono { false } }
-
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { false }
+        }
 
         given(
-            mongoTemplate.upsert(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any()
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
-            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId))  } }
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1010,10 +991,7 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.CLOSED,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.CLOSED, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
@@ -1029,47 +1007,44 @@ class TransactionViewUpsertServiceTest {
                 eq(collectionName),
             )
 
-        verify(mongoTemplate, times(0)).updateFirst(
-            eq(queryByTransactionId),
-            any(),
-            any(),
-            any(),
-        )
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
-        verify(mongoTemplate, times(1)).exists(
-            eq(queryByTransactionId), eq(BaseTransactionView::class.java),
-            eq(collectionName),)
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
 
-        verify(mongoTemplate, times(1)).
-        upsert(
-            eq(queryByTransactionAndLastProcessedEventAtCondition),
-            argThat { update ->
-                val setDocument = update.updateObject[$$"$set"] as Document
-                assertEquals(
-                    TransactionStatusDto.CLOSED,
-                    setDocument["status"],
-                )
-                assertEquals(
-                    ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
-                    setDocument["lastProcessedEventAt"],
-                )
-                assertEquals(
-                    TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
-                    setDocument["sendPaymentResultOutcome"].toString(),
-                )
-                assertEquals(null, setDocument["closureErrorData"])
-                true
-            },
-            eq(BaseTransactionView::class.java),
-            eq(collectionName),
-        )
-
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CLOSED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    assertEquals(null, setDocument["closureErrorData"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
     }
 
     @Test
     fun `should perform upsert operation gathering data from transaction close canceled event with OK Node outcome when transaction view doesn't exist`() {
         // pre-conditions
-        val event = TransactionTestUtils.transactionClosedEventCanceledByUser(TransactionClosureData.Outcome.OK)
+        val event =
+            TransactionTestUtils.transactionClosedEventCanceledByUser(
+                TransactionClosureData.Outcome.OK
+            )
 
         val queryByTransactionId =
             Query.query(Criteria.where("transactionId").`is`(event.transactionId))
@@ -1085,36 +1060,31 @@ class TransactionViewUpsertServiceTest {
                     )
             )
 
-
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(
-            mongoTemplate.exists(
-                eq(queryByTransactionId),
-                any(),
-                any()
-            )
-        )
-            .willAnswer { mono { false } }
-
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { false }
+        }
 
         given(
-            mongoTemplate.upsert(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any()
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
-            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId))  } }
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1127,10 +1097,7 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.CANCELED,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.CANCELED, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
@@ -1146,43 +1113,36 @@ class TransactionViewUpsertServiceTest {
                 eq(collectionName),
             )
 
-        verify(mongoTemplate, times(0)).updateFirst(
-            eq(queryByTransactionId),
-            any(),
-            any(),
-            any(),
-        )
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
-        verify(mongoTemplate, times(1)).exists(
-            eq(queryByTransactionId), eq(BaseTransactionView::class.java),
-            eq(collectionName),)
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
 
-        verify(mongoTemplate, times(1)).
-        upsert(
-            eq(queryByTransactionAndLastProcessedEventAtCondition),
-            argThat { update ->
-                val setDocument = update.updateObject[$$"$set"] as Document
-                assertEquals(
-                    TransactionStatusDto.CANCELED,
-                    setDocument["status"],
-                )
-                assertEquals(
-                    ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
-                    setDocument["lastProcessedEventAt"],
-                )
-                assertEquals(
-                    TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
-                    setDocument["sendPaymentResultOutcome"].toString(),
-                )
-                assertEquals(null, setDocument["closureErrorData"])
-                true
-            },
-            eq(BaseTransactionView::class.java),
-            eq(collectionName),
-        )
-
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CANCELED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    assertEquals(null, setDocument["closureErrorData"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
     }
-
 
     @Test
     fun `should throw CDC query exception operation processing transaction close event with OK Node outcome when transaction view exist with lastProcessedEventAt timestamp after event creationDate`() {
@@ -1203,26 +1163,19 @@ class TransactionViewUpsertServiceTest {
                     )
             )
 
-
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(
-            mongoTemplate.exists(
-                eq(queryByTransactionId),
-                any(),
-                any()
-            )
-        )
-            .willAnswer { mono { true } }
-
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { true }
+        }
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1235,10 +1188,7 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.CLOSED,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.CLOSED, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
@@ -1254,31 +1204,26 @@ class TransactionViewUpsertServiceTest {
                 eq(collectionName),
             )
 
-        verify(mongoTemplate, times(0)).updateFirst(
-            eq(queryByTransactionId),
-            any(),
-            any(),
-            any(),
-        )
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
-        verify(mongoTemplate, times(1)).exists(
-            eq(queryByTransactionId), eq(BaseTransactionView::class.java),
-            eq(collectionName),)
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
 
-        verify(mongoTemplate, times(0)).
-        upsert(
-            eq(queryByTransactionAndLastProcessedEventAtCondition),
-            any(),
-            any(),
-            any(),
-        )
-
+        verify(mongoTemplate, times(0))
+            .upsert(eq(queryByTransactionAndLastProcessedEventAtCondition), any(), any(), any())
     }
 
     @Test
     fun `should throw CDC query exception operation processing transaction closed canceled event with OK Node outcome when transaction view exists with lastProcessedEventAt timestamp after event creationDate`() {
         // pre-conditions
-        val event = TransactionTestUtils.transactionClosedEventCanceledByUser(TransactionClosureData.Outcome.OK)
+        val event =
+            TransactionTestUtils.transactionClosedEventCanceledByUser(
+                TransactionClosureData.Outcome.OK
+            )
 
         val queryByTransactionId =
             Query.query(Criteria.where("transactionId").`is`(event.transactionId))
@@ -1294,26 +1239,19 @@ class TransactionViewUpsertServiceTest {
                     )
             )
 
-
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(
-            mongoTemplate.exists(
-                eq(queryByTransactionId),
-                any(),
-                any()
-            )
-        )
-            .willAnswer { mono { true } }
-
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { true }
+        }
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1326,10 +1264,7 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.CANCELED,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.CANCELED, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
@@ -1345,29 +1280,20 @@ class TransactionViewUpsertServiceTest {
                 eq(collectionName),
             )
 
-        verify(mongoTemplate, times(0)).updateFirst(
-            eq(queryByTransactionId),
-            any(),
-            any(),
-            any(),
-        )
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
-        verify(mongoTemplate, times(1)).exists(
-            eq(queryByTransactionId), eq(BaseTransactionView::class.java),
-            eq(collectionName),)
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
 
-        verify(mongoTemplate, times(0)).
-        upsert(
-            eq(queryByTransactionAndLastProcessedEventAtCondition),
-            any(),
-            any(),
-            any(),
-        )
-
+        verify(mongoTemplate, times(0))
+            .upsert(eq(queryByTransactionAndLastProcessedEventAtCondition), any(), any(), any())
     }
 
-
-    //Closure Error
+    // Closure Error
     @Test
     fun `should perform upsert operation gathering data from transaction closure error event when transaction view exists with lastProcessedEventAt timestamp before event creationDate`() {
         // pre-conditions
@@ -1394,13 +1320,13 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
 
         // test
@@ -1414,10 +1340,7 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.CLOSURE_ERROR,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.CLOSURE_ERROR, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
@@ -1433,13 +1356,11 @@ class TransactionViewUpsertServiceTest {
                 eq(collectionName),
             )
 
-
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
         verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
 
         verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
-
     }
 
     @Test
@@ -1468,33 +1389,30 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(
-            mongoTemplate.exists(
-                eq(queryByTransactionId),
-                any(),
-                any(),
-            )
-        )
-            .willAnswer { mono { false } }
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { false }
+        }
 
         given(
-            mongoTemplate.upsert(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any()
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
-            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) } }
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1507,10 +1425,7 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.CLOSURE_ERROR,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.CLOSURE_ERROR, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
@@ -1526,38 +1441,35 @@ class TransactionViewUpsertServiceTest {
                 eq(collectionName),
             )
 
-
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
-        verify(mongoTemplate, times(1)).exists(
-            eq(queryByTransactionId),
-            eq(BaseTransactionView::class.java),
-            eq(collectionName),
-        )
-
-        verify(mongoTemplate, times(1)).upsert(
-            eq(queryByTransactionAndLastProcessedEventAtCondition),
-            argThat { update ->
-                val setDocument = update.updateObject[$$"$set"] as Document
-                assertEquals(
-                    TransactionStatusDto.CLOSURE_ERROR,
-                    setDocument["status"],
-                )
-                assertEquals(
-                    ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
-                    setDocument["lastProcessedEventAt"],
-                )
-                assertEquals(closureErrorData, setDocument["closureErrorData"])
-                assertEquals(
-                    TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
-                    setDocument["sendPaymentResultOutcome"].toString(),
-                )
-                true
-            },
-            eq(BaseTransactionView::class.java),
-            eq(collectionName),
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
             )
 
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CLOSURE_ERROR, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(closureErrorData, setDocument["closureErrorData"])
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
     }
 
     @Test
@@ -1586,23 +1498,18 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(
-            mongoTemplate.exists(
-                eq(queryByTransactionId),
-                any(),
-                any(),
-            )
-        )
-            .willAnswer { mono { true } }
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { true }
+        }
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1615,10 +1522,7 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.CLOSURE_ERROR,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.CLOSURE_ERROR, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
@@ -1634,25 +1538,19 @@ class TransactionViewUpsertServiceTest {
                 eq(collectionName),
             )
 
-
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
-        verify(mongoTemplate, times(1)).exists(
-            eq(queryByTransactionId),
-            eq(BaseTransactionView::class.java),
-            eq(collectionName),
-        )
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
 
-        verify(mongoTemplate, times(0)).upsert(
-            any(),
-            any(),
-            any(),
-            any(),
-        )
-
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
     }
 
-    //Closure retried
+    // Closure retried
     @Test
     fun `should perform upsert operation gathering data from transaction closure retried data when transaction view exists with lastProcessedEventAt timestamp before event creationDate`() {
         // pre-conditions
@@ -1679,13 +1577,13 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
 
         // test
@@ -1710,13 +1608,11 @@ class TransactionViewUpsertServiceTest {
                 eq(collectionName),
             )
 
-
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
         verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
 
         verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
-
     }
 
     @Test
@@ -1745,33 +1641,30 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(
-            mongoTemplate.exists(
-                eq(queryByTransactionId),
-                any(),
-                any(),
-            )
-        )
-            .willAnswer { mono { false } }
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { false }
+        }
 
         given(
-            mongoTemplate.upsert(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any()
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
-            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) } }
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1795,30 +1688,30 @@ class TransactionViewUpsertServiceTest {
                 eq(collectionName),
             )
 
-
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
-        verify(mongoTemplate, times(1)).exists(
-            eq(queryByTransactionId),
-            eq(BaseTransactionView::class.java),
-            eq(collectionName),
-        )
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
 
-        verify(mongoTemplate, times(1)).upsert(
-            eq(queryByTransactionAndLastProcessedEventAtCondition),
-            argThat { update ->
-                val setDocument = update.updateObject[$$"$set"] as Document
-                assertEquals(closureErrorData, setDocument["closureErrorData"])
-                assertEquals(
-                    TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
-                    setDocument["sendPaymentResultOutcome"].toString(),
-                )
-                true
-            },
-            eq(BaseTransactionView::class.java),
-            eq(collectionName),
-        )
-
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(closureErrorData, setDocument["closureErrorData"])
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
     }
 
     @Test
@@ -1847,23 +1740,18 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(
-            mongoTemplate.exists(
-                eq(queryByTransactionId),
-                any(),
-                any(),
-            )
-        )
-            .willAnswer { mono { true } }
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { true }
+        }
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1887,29 +1775,23 @@ class TransactionViewUpsertServiceTest {
                 eq(collectionName),
             )
 
-
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
-        verify(mongoTemplate, times(1)).exists(
-            eq(queryByTransactionId),
-            eq(BaseTransactionView::class.java),
-            eq(collectionName),
-        )
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
 
-        verify(mongoTemplate, times(0)).upsert(
-            any(),
-            any(),
-            any(),
-            any(),
-        )
-
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
     }
 
     @ParameterizedTest
     @ValueSource(strings = ["OK", "KO"])
     fun `should perform upsert operation gathering data from transaction add user receipt requested event when transaction view is already present with lastProcessedEventAt timestamp before event creationDate `(
         sendPaymentResultOutcome: String
-    ){
+    ) {
         // pre-conditions
         val event =
             TransactionTestUtils.transactionUserReceiptRequestedEvent(
@@ -1932,13 +1814,13 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
 
         // test
@@ -1952,15 +1834,15 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.NOTIFICATION_REQUESTED,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.NOTIFICATION_REQUESTED, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
-                    assertEquals(sendPaymentResultOutcome, setDocument["sendPaymentResultOutcome"].toString())
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1978,7 +1860,7 @@ class TransactionViewUpsertServiceTest {
     @ValueSource(strings = ["OK", "KO"])
     fun `should perform upsert operation gathering data from transaction add user receipt requested event when is the first event processed for that transaction`(
         sendPaymentResultOutcome: String
-    ){
+    ) {
         // pre-conditions
         val event =
             TransactionTestUtils.transactionUserReceiptRequestedEvent(
@@ -2001,13 +1883,13 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
         given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
@@ -2015,13 +1897,13 @@ class TransactionViewUpsertServiceTest {
         }
 
         given(
-            mongoTemplate.upsert(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer {
                 mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
             }
@@ -2040,58 +1922,69 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.NOTIFICATION_REQUESTED,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.NOTIFICATION_REQUESTED, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
-                    assertEquals(sendPaymentResultOutcome, setDocument["sendPaymentResultOutcome"].toString())
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
                     true
                 },
                 eq(BaseTransactionView::class.java),
                 eq(collectionName),
             )
 
-        verify(mongoTemplate, times(1)).updateFirst(eq(queryByTransactionId),
-            argThat { update ->
-                val setDocument = update.updateObject[$$"$set"] as Document
-                assertEquals(sendPaymentResultOutcome, setDocument["sendPaymentResultOutcome"].toString())
-                true
-            },
-            eq(BaseTransactionView::class.java),
-            eq(collectionName),
-        )
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionId),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
 
-        verify(mongoTemplate, times(1)).exists(eq(queryByTransactionId), eq(BaseTransactionView::class.java),
-            eq(collectionName),)
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
 
-        verify(mongoTemplate, times(1)).upsert(
-            eq(queryByTransactionAndLastProcessedEventAtCondition),
-            argThat { update ->
-                val setDocument = update.updateObject[$$"$set"] as Document
-                assertEquals(
-                    TransactionStatusDto.NOTIFICATION_REQUESTED,
-                    setDocument["status"],
-                )
-                assertEquals(
-                    ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
-                    setDocument["lastProcessedEventAt"],
-                )
-                assertEquals(sendPaymentResultOutcome, setDocument["sendPaymentResultOutcome"].toString())
-                true
-            },
-            eq(BaseTransactionView::class.java),
-            eq(collectionName),
-        )
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.NOTIFICATION_REQUESTED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
     }
 
     @ParameterizedTest
     @ValueSource(strings = ["OK", "KO"])
-    fun `should perform upsert operation gathering data from transaction add user receipt requested event when transaction view is already present with lastProcessedEventAt timestamp after event creationDate `(        sendPaymentResultOutcome: String
-    ){
+    fun `should perform upsert operation gathering data from transaction add user receipt requested event when transaction view is already present with lastProcessedEventAt timestamp after event creationDate `(
+        sendPaymentResultOutcome: String
+    ) {
         // pre-conditions
         val event =
             TransactionTestUtils.transactionUserReceiptRequestedEvent(
@@ -2115,13 +2008,13 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
         given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
@@ -2139,7 +2032,10 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionId),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(sendPaymentResultOutcome, setDocument["sendPaymentResultOutcome"].toString())
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -2151,15 +2047,15 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(
-                        TransactionStatusDto.NOTIFICATION_REQUESTED,
-                        setDocument["status"],
-                    )
+                    assertEquals(TransactionStatusDto.NOTIFICATION_REQUESTED, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
-                    assertEquals(sendPaymentResultOutcome, setDocument["sendPaymentResultOutcome"].toString())
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
                     true
                 },
                 eq(BaseTransactionView::class.java),

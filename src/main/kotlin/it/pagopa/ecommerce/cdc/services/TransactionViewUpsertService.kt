@@ -157,9 +157,9 @@ class TransactionViewUpsertService(
     /**
      * Builds a pair of MongoDB Update object based on the event type and content. Different events
      * update different portions of the transaction view document. The first member can be null and
-     * contains update that doesn't need tobe matched against lastProcessedEventAt field in the view.
-     * The second one is not nullable and contains all updates about info to save and also status
-     * and lastProcessedEventAt field to update in the view.
+     * contains update that doesn't need tobe matched against lastProcessedEventAt field in the
+     * view. The second one is not nullable and contains all updates about info to save and also
+     * status and lastProcessedEventAt field to update in the view.
      *
      * @param event The MongoDB change stream event document
      * @return Mono of a pair of update object with field updates based on event type.
