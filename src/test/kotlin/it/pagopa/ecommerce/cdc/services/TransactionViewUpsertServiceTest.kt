@@ -1,6 +1,7 @@
 package it.pagopa.ecommerce.cdc.services
 
 import com.mongodb.client.result.UpdateResult
+import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
 import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import it.pagopa.ecommerce.commons.documents.v2.*
 import it.pagopa.ecommerce.commons.documents.v2.authorization.RedirectTransactionGatewayAuthorizationData
@@ -499,36 +500,299 @@ class TransactionViewUpsertServiceTest {
     // Authorization Completed
     @ParameterizedTest
     @MethodSource("authorization completed test data method source")
-    fun `should perform upsert operation gathering data from transaction authorization completed event`(
+    fun `should perform upsert operation gathering data from transaction authorization completed event when transaction view is already present with lastProcessedEventAt timestamp before event creationDate `(
         event: TransactionAuthorizationCompletedEvent,
         expectedAuthorizationStatus: String,
         expectedAuthorizationErrorCode: String,
     ) {
         // pre-conditions)
-        given(mongoTemplate.upsert(any(), any(), any(), any()))
-            .willReturn(Mono.just(UpdateResult.acknowledged(1L, 1L, null)))
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
+
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
-            .expectNext(UpdateResult.acknowledged(0L, 0L, null))
+            .expectNext(UpdateResult.acknowledged(1L, 1L, null))
             .verifyComplete()
 
         // verifications
         verify(mongoTemplate, times(1))
-            .upsert(
-                argThat { query ->
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
                     assertEquals(
-                        event.transactionId,
-                        query.queryObject.filter { it.key == "transactionId" }.map { it.value }[0],
+                        TransactionStatusDto.AUTHORIZATION_COMPLETED,
+                        setDocument["status"],
+                    )
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(event.data.rrn, setDocument["rrn"])
+                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    assertEquals(
+                        expectedAuthorizationStatus,
+                        setDocument["gatewayAuthorizationStatus"].toString(),
+                    )
+                    assertEquals(
+                        expectedAuthorizationErrorCode,
+                        setDocument["authorizationErrorCode"],
                     )
                     true
                 },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+    }
+
+    @ParameterizedTest
+    @MethodSource("authorization completed test data method source")
+    fun `should perform upsert operation gathering data from transaction authorization completed event when transaction view is already present with lastProcessedEventAt timestamp after event creationDate `(
+        event: TransactionAuthorizationCompletedEvent,
+        expectedAuthorizationStatus: String,
+        expectedAuthorizationErrorCode: String,
+    ) {
+        // pre-conditions)
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
+            mono { UpdateResult.acknowledged(1L, 1L, null) }
+        }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(1L, 1L, null))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(
+                        TransactionStatusDto.AUTHORIZATION_COMPLETED,
+                        setDocument["status"],
+                    )
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(event.data.rrn, setDocument["rrn"])
+                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    assertEquals(
+                        expectedAuthorizationStatus,
+                        setDocument["gatewayAuthorizationStatus"].toString(),
+                    )
+                    assertEquals(
+                        expectedAuthorizationErrorCode,
+                        setDocument["authorizationErrorCode"],
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionId),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
                     assertEquals(event.data.rrn, setDocument["rrn"])
                     assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
                     assertEquals(
                         expectedAuthorizationStatus,
-                        setDocument["gatewayAuthorizationStatus"],
+                        setDocument["gatewayAuthorizationStatus"].toString(),
+                    )
+                    assertEquals(
+                        expectedAuthorizationErrorCode,
+                        setDocument["authorizationErrorCode"],
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+    }
+
+    @ParameterizedTest
+    @MethodSource("authorization completed test data method source")
+    fun `should perform upsert operation gathering data from transaction authorization completed event when transaction view is not present`(
+        event: TransactionAuthorizationCompletedEvent,
+        expectedAuthorizationStatus: String,
+        expectedAuthorizationErrorCode: String,
+    ) {
+        // pre-conditions)
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
+            mono { UpdateResult.acknowledged(0L, 0L, null) }
+        }
+
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
+
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any()))
+            .willReturn(Mono.just(false))
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(
+                        TransactionStatusDto.AUTHORIZATION_COMPLETED,
+                        setDocument["status"],
+                    )
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(event.data.rrn, setDocument["rrn"])
+                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    assertEquals(
+                        expectedAuthorizationStatus,
+                        setDocument["gatewayAuthorizationStatus"].toString(),
+                    )
+                    assertEquals(
+                        expectedAuthorizationErrorCode,
+                        setDocument["authorizationErrorCode"],
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionId),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(event.data.rrn, setDocument["rrn"])
+                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    assertEquals(
+                        expectedAuthorizationStatus,
+                        setDocument["gatewayAuthorizationStatus"].toString(),
+                    )
+                    assertEquals(
+                        expectedAuthorizationErrorCode,
+                        setDocument["authorizationErrorCode"],
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(event.data.rrn, setDocument["rrn"])
+                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    assertEquals(
+                        expectedAuthorizationStatus,
+                        setDocument["gatewayAuthorizationStatus"].toString(),
                     )
                     assertEquals(
                         expectedAuthorizationErrorCode,
@@ -541,32 +805,230 @@ class TransactionViewUpsertServiceTest {
             )
     }
 
+    // CLOSED
     @Test
-    fun `should perform upsert operation gathering data from transaction closed event with OK Node outcome`() {
+    fun `should perform upsert operation gathering data from transaction closed event with OK Node outcome when transaction view is already present with lastProcessedEventAt timestamp before event creationDate`() {
         // pre-conditions
         val event = TransactionTestUtils.transactionClosedEvent(TransactionClosureData.Outcome.OK)
-        given(mongoTemplate.upsert(any(), any(), any(), any()))
-            .willReturn(Mono.just(UpdateResult.acknowledged(1L, 1L, null)))
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
+
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
-            .expectNext(UpdateResult.acknowledged(0L, 0L, null))
+            .expectNext(UpdateResult.acknowledged(1L, 1L, null))
             .verifyComplete()
 
         // verifications
         verify(mongoTemplate, times(1))
-            .upsert(
-                argThat { query ->
-                    assertEquals(
-                        event.transactionId,
-                        query.queryObject.filter { it.key == "transactionId" }.map { it.value }[0],
-                    )
-                    true
-                },
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CLOSED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
                     assertEquals(
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
-                        setDocument["sendPaymentResultOutcome"],
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    assertEquals(null, setDocument["closureErrorData"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+    }
+
+    @Test
+    fun `should perform upsert operation gathering data from transaction closed canceled event with OK Node outcome when transaction view is already present with lastProcessedEventAt timestamp before event creationDate`() {
+        // pre-conditions
+        val event =
+            TransactionTestUtils.transactionClosedEventCanceledByUser(
+                TransactionClosureData.Outcome.OK
+            )
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(1L, 1L, null))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CANCELED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    assertEquals(null, setDocument["closureErrorData"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+    }
+
+    @Test
+    fun `should perform upsert operation gathering data from transaction closed event with OK Node outcome when transaction view doesn't exist`() {
+        // pre-conditions
+        val event = TransactionTestUtils.transactionClosedEvent(TransactionClosureData.Outcome.OK)
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { false }
+        }
+
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CLOSED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    assertEquals(null, setDocument["closureErrorData"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CLOSED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
                     true
@@ -577,7 +1039,263 @@ class TransactionViewUpsertServiceTest {
     }
 
     @Test
-    fun `should perform upsert operation gathering data from transaction closure error event`() {
+    fun `should perform upsert operation gathering data from transaction close canceled event with OK Node outcome when transaction view doesn't exist`() {
+        // pre-conditions
+        val event =
+            TransactionTestUtils.transactionClosedEventCanceledByUser(
+                TransactionClosureData.Outcome.OK
+            )
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { false }
+        }
+
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CANCELED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    assertEquals(null, setDocument["closureErrorData"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CANCELED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    assertEquals(null, setDocument["closureErrorData"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+    }
+
+    @Test
+    fun `should throw CDC query exception operation processing transaction close event with OK Node outcome when transaction view exist with lastProcessedEventAt timestamp after event creationDate`() {
+        // pre-conditions
+        val event = TransactionTestUtils.transactionClosedEvent(TransactionClosureData.Outcome.OK)
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { true }
+        }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectError(CdcQueryMatchException::class.java)
+            .verify()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CLOSED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    assertEquals(null, setDocument["closureErrorData"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0))
+            .upsert(eq(queryByTransactionAndLastProcessedEventAtCondition), any(), any(), any())
+    }
+
+    @Test
+    fun `should throw CDC query exception operation processing transaction closed canceled event with OK Node outcome when transaction view exists with lastProcessedEventAt timestamp after event creationDate`() {
+        // pre-conditions
+        val event =
+            TransactionTestUtils.transactionClosedEventCanceledByUser(
+                TransactionClosureData.Outcome.OK
+            )
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { true }
+        }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectError(CdcQueryMatchException::class.java)
+            .verify()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CANCELED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    assertEquals(null, setDocument["closureErrorData"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0))
+            .upsert(eq(queryByTransactionAndLastProcessedEventAtCondition), any(), any(), any())
+    }
+
+    // Closure Error
+    @Test
+    fun `should perform upsert operation gathering data from transaction closure error event when transaction view exists with lastProcessedEventAt timestamp before event creationDate`() {
         // pre-conditions
         val closureErrorData =
             ClosureErrorData(
@@ -586,29 +1304,166 @@ class TransactionViewUpsertServiceTest {
                 ClosureErrorData.ErrorType.COMMUNICATION_ERROR,
             )
         val event = TransactionTestUtils.transactionClosureErrorEvent(closureErrorData)
-        given(mongoTemplate.upsert(any(), any(), any(), any()))
-            .willReturn(Mono.just(UpdateResult.acknowledged(1L, 1L, null)))
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
+
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
-            .expectNext(UpdateResult.acknowledged(0L, 0L, null))
+            .expectNext(UpdateResult.acknowledged(1L, 1L, null))
             .verifyComplete()
 
         // verifications
         verify(mongoTemplate, times(1))
-            .upsert(
-                argThat { query ->
-                    assertEquals(
-                        event.transactionId,
-                        query.queryObject.filter { it.key == "transactionId" }.map { it.value }[0],
-                    )
-                    true
-                },
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CLOSURE_ERROR, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
                     assertEquals(closureErrorData, setDocument["closureErrorData"])
                     assertEquals(
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
-                        setDocument["sendPaymentResultOutcome"],
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+    }
+
+    @Test
+    fun `should perform upsert operation gathering data from transaction closure error event when transaction view doesn't exists`() {
+        // pre-conditions
+        val closureErrorData =
+            ClosureErrorData(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Generic error",
+                ClosureErrorData.ErrorType.COMMUNICATION_ERROR,
+            )
+        val event = TransactionTestUtils.transactionClosureErrorEvent(closureErrorData)
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { false }
+        }
+
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CLOSURE_ERROR, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(closureErrorData, setDocument["closureErrorData"])
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CLOSURE_ERROR, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(closureErrorData, setDocument["closureErrorData"])
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     true
                 },
@@ -618,7 +1473,86 @@ class TransactionViewUpsertServiceTest {
     }
 
     @Test
-    fun `should perform upsert operation gathering data from transaction closure retried data`() {
+    fun `should perform upsert operation gathering data from transaction closure error event when transaction view exists and lastProcessedEventAt after event creationDate`() {
+        // pre-conditions
+        val closureErrorData =
+            ClosureErrorData(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Generic error",
+                ClosureErrorData.ErrorType.COMMUNICATION_ERROR,
+            )
+        val event = TransactionTestUtils.transactionClosureErrorEvent(closureErrorData)
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { true }
+        }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectError(CdcQueryMatchException::class.java)
+            .verify()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.CLOSURE_ERROR, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(closureErrorData, setDocument["closureErrorData"])
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+    }
+
+    // Closure retried
+    @Test
+    fun `should perform upsert operation gathering data from transaction closure retried data when transaction view exists with lastProcessedEventAt timestamp before event creationDate`() {
         // pre-conditions
         val closureErrorData =
             ClosureErrorData(
@@ -627,29 +1561,417 @@ class TransactionViewUpsertServiceTest {
                 ClosureErrorData.ErrorType.COMMUNICATION_ERROR,
             )
         val event = TransactionTestUtils.transactionClosureRetriedEvent(1, closureErrorData)
-        given(mongoTemplate.upsert(any(), any(), any(), any()))
-            .willReturn(Mono.just(UpdateResult.acknowledged(1L, 1L, null)))
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
+
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
-            .expectNext(UpdateResult.acknowledged(0L, 0L, null))
+            .expectNext(UpdateResult.acknowledged(1L, 1L, null))
             .verifyComplete()
 
         // verifications
         verify(mongoTemplate, times(1))
-            .upsert(
-                argThat { query ->
-                    assertEquals(
-                        event.transactionId,
-                        query.queryObject.filter { it.key == "transactionId" }.map { it.value }[0],
-                    )
-                    true
-                },
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
                     assertEquals(closureErrorData, setDocument["closureErrorData"])
                     assertEquals(
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
-                        setDocument["sendPaymentResultOutcome"],
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+    }
+
+    @Test
+    fun `should perform upsert operation gathering data from transaction closure retried data when transaction view doesn't exists`() {
+        // pre-conditions
+        val closureErrorData =
+            ClosureErrorData(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Generic error",
+                ClosureErrorData.ErrorType.COMMUNICATION_ERROR,
+            )
+        val event = TransactionTestUtils.transactionClosureRetriedEvent(1, closureErrorData)
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { false }
+        }
+
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(closureErrorData, setDocument["closureErrorData"])
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(closureErrorData, setDocument["closureErrorData"])
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+    }
+
+    @Test
+    fun `should perform upsert operation gathering data from transaction closure retried data when transaction view exists and lastProcessedEventAt after event creationDate`() {
+        // pre-conditions
+        val closureErrorData =
+            ClosureErrorData(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Generic error",
+                ClosureErrorData.ErrorType.COMMUNICATION_ERROR,
+            )
+        val event = TransactionTestUtils.transactionClosureRetriedEvent(1, closureErrorData)
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { true }
+        }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectError(CdcQueryMatchException::class.java)
+            .verify()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(closureErrorData, setDocument["closureErrorData"])
+                    assertEquals(
+                        TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["OK", "KO"])
+    fun `should perform upsert operation gathering data from transaction add user receipt requested event when transaction view is already present with lastProcessedEventAt timestamp before event creationDate `(
+        sendPaymentResultOutcome: String
+    ) {
+        // pre-conditions
+        val event =
+            TransactionTestUtils.transactionUserReceiptRequestedEvent(
+                TransactionTestUtils.transactionUserReceiptData(
+                    TransactionUserReceiptData.Outcome.valueOf(sendPaymentResultOutcome)
+                )
+            )
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(1L, 1L, null))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.NOTIFICATION_REQUESTED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["OK", "KO"])
+    fun `should perform upsert operation gathering data from transaction add user receipt requested event when is the first event processed for that transaction`(
+        sendPaymentResultOutcome: String
+    ) {
+        // pre-conditions
+        val event =
+            TransactionTestUtils.transactionUserReceiptRequestedEvent(
+                TransactionTestUtils.transactionUserReceiptData(
+                    TransactionUserReceiptData.Outcome.valueOf(sendPaymentResultOutcome)
+                )
+            )
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
+            mono { UpdateResult.acknowledged(0L, 0L, null) }
+        }
+
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
+
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any()))
+            .willReturn(Mono.just(false))
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.NOTIFICATION_REQUESTED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionId),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.NOTIFICATION_REQUESTED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     true
                 },
@@ -660,7 +1982,7 @@ class TransactionViewUpsertServiceTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["OK", "KO"])
-    fun `should perform upsert operation gathering data from transaction add user receipt requested event data`(
+    fun `should perform upsert operation gathering data from transaction add user receipt requested event when transaction view is already present with lastProcessedEventAt timestamp after event creationDate `(
         sendPaymentResultOutcome: String
     ) {
         // pre-conditions
@@ -670,31 +1992,78 @@ class TransactionViewUpsertServiceTest {
                     TransactionUserReceiptData.Outcome.valueOf(sendPaymentResultOutcome)
                 )
             )
-        given(mongoTemplate.upsert(any(), any(), any(), any()))
-            .willReturn(Mono.just(UpdateResult.acknowledged(1L, 1L, null)))
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
+            mono { UpdateResult.acknowledged(1L, 1L, null) }
+        }
+
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
-            .expectNext(UpdateResult.acknowledged(0L, 0L, null))
+            .expectNext(UpdateResult.acknowledged(1L, 1L, null))
             .verifyComplete()
 
         // verifications
         verify(mongoTemplate, times(1))
-            .upsert(
-                argThat { query ->
-                    assertEquals(
-                        event.transactionId,
-                        query.queryObject.filter { it.key == "transactionId" }.map { it.value }[0],
-                    )
-                    true
-                },
+            .updateFirst(
+                eq(queryByTransactionId),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(sendPaymentResultOutcome, setDocument["sendPaymentResultOutcome"])
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
                     true
                 },
                 eq(BaseTransactionView::class.java),
                 eq(collectionName),
             )
+
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(TransactionStatusDto.NOTIFICATION_REQUESTED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(
+                        sendPaymentResultOutcome,
+                        setDocument["sendPaymentResultOutcome"].toString(),
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
     }
 
     @ParameterizedTest
