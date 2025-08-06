@@ -24,7 +24,6 @@ import org.mockito.kotlin.*
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
-import org.springframework.data.mongodb.core.updateFirst
 import org.springframework.http.HttpStatus
 import reactor.core.publisher.Mono
 import reactor.test.StepVerifier
@@ -68,32 +67,62 @@ class TransactionViewUpsertServiceTest {
 
         @JvmStatic
         fun `no upsert done for events that does not update view method source`():
-            Stream<TransactionEvent<*>> {
+            Stream<Pair<TransactionEvent<*>, TransactionStatusDto?>> {
             val baseTransaction =
                 TransactionTestUtils.transactionActivated(ZonedDateTime.now().toString())
             return Stream.of(
-                TransactionTestUtils.transactionClosedEvent(TransactionClosureData.Outcome.KO),
-                TransactionTestUtils.transactionExpiredEvent(TransactionStatusDto.ACTIVATED),
-                TransactionTestUtils.transactionRefundRequestedEvent(baseTransaction),
-                TransactionTestUtils.transactionUserCanceledEvent(),
-                TransactionTestUtils.transactionClosureRequestedEvent(),
-                TransactionTestUtils.transactionRefundErrorEvent(),
-                TransactionTestUtils.transactionUserReceiptAddedEvent(
-                    TransactionTestUtils.transactionUserReceiptData(
-                        TransactionUserReceiptData.Outcome.OK
-                    )
+                Pair(
+                    TransactionTestUtils.transactionClosedEvent(TransactionClosureData.Outcome.KO),
+                    TransactionStatusDto.UNAUTHORIZED,
                 ),
-                TransactionTestUtils.transactionUserReceiptAddErrorEvent(
-                    TransactionTestUtils.transactionUserReceiptData(
-                        TransactionUserReceiptData.Outcome.OK
-                    )
+                Pair(
+                    TransactionTestUtils.transactionExpiredEvent(TransactionStatusDto.ACTIVATED),
+                    TransactionStatusDto.EXPIRED,
                 ),
-                TransactionTestUtils.transactionClosureFailedEvent(
-                    TransactionClosureData.Outcome.OK
+                Pair(
+                    TransactionTestUtils.transactionRefundRequestedEvent(baseTransaction),
+                    TransactionStatusDto.REFUND_REQUESTED,
                 ),
-                TransactionTestUtils.transactionRefundedEvent(baseTransaction),
-                TransactionTestUtils.transactionRefundRetriedEvent(1),
-                TransactionTestUtils.transactionUserReceiptAddRetriedEvent(1),
+                Pair(
+                    TransactionTestUtils.transactionUserCanceledEvent(),
+                    TransactionStatusDto.CANCELLATION_REQUESTED,
+                ),
+                Pair(
+                    TransactionTestUtils.transactionClosureRequestedEvent(),
+                    TransactionStatusDto.CLOSURE_REQUESTED,
+                ),
+                Pair(
+                    TransactionTestUtils.transactionRefundErrorEvent(),
+                    TransactionStatusDto.REFUND_ERROR,
+                ),
+                Pair(
+                    TransactionTestUtils.transactionUserReceiptAddedEvent(
+                        TransactionTestUtils.transactionUserReceiptData(
+                            TransactionUserReceiptData.Outcome.OK
+                        )
+                    ),
+                    TransactionStatusDto.NOTIFIED_OK,
+                ),
+                Pair(
+                    TransactionTestUtils.transactionUserReceiptAddErrorEvent(
+                        TransactionTestUtils.transactionUserReceiptData(
+                            TransactionUserReceiptData.Outcome.OK
+                        )
+                    ),
+                    TransactionStatusDto.NOTIFICATION_ERROR,
+                ),
+                Pair(
+                    TransactionTestUtils.transactionClosureFailedEvent(
+                        TransactionClosureData.Outcome.OK
+                    ),
+                    TransactionStatusDto.UNAUTHORIZED,
+                ),
+                Pair(
+                    TransactionTestUtils.transactionRefundedEvent(baseTransaction),
+                    TransactionStatusDto.REFUNDED,
+                ),
+                Pair(TransactionTestUtils.transactionRefundRetriedEvent(1), null),
+                Pair(TransactionTestUtils.transactionUserReceiptAddRetriedEvent(1), null),
             )
         }
     }
@@ -2068,18 +2097,99 @@ class TransactionViewUpsertServiceTest {
 
     @ParameterizedTest
     @MethodSource("no upsert done for events that does not update view method source")
-    fun `should not perform upsert operation for events that does not update view data section`(
-        event: TransactionEvent<*>
+    fun `should create view when it doesn't exists yet`(
+        pair: Pair<TransactionEvent<*>, TransactionStatusDto?>
     ) {
+        val event = pair.first
+        val status = pair.second
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
+            mono { false }
+        }
+
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
+
         // pre-conditions
         given(mongoTemplate.upsert(any(), any(), any(), any()))
-            .willReturn(Mono.just(UpdateResult.acknowledged(1L, 1L, null)))
+            .willReturn(
+                Mono.just(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
+            )
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
-            .expectNext(UpdateResult.acknowledged(0L, 0L, null))
+            .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
             .verifyComplete()
 
         // verifications
-        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(status, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    true
+                },
+                any(),
+                any(),
+            )
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+        verify(mongoTemplate, times(1))
+            .exists(
+                eq(queryByTransactionId),
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    if (status != null) assertEquals(status, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
     }
 }
