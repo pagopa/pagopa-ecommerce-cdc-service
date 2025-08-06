@@ -24,11 +24,11 @@ class EcommerceCDCEventDispatcherService(
     private val logger: Logger = LoggerFactory.getLogger(javaClass)
 
     /**
-     * Dispatches a collection change event for processing. Logs event details and performs upsert
-     * operations on the transaction view.
+     * Dispatches a transaction event for CDC processing. Logs event details and performs upsert
+     * operations on the transaction view with retry logic and error handling.
      *
-     * @param event The MongoDB change stream document containing eventstore data
-     * @return Mono<Document> The processed document
+     * @param event The transaction event containing transaction data and metadata
+     * @return Mono<TransactionEvent<*>> The processed transaction event
      */
     fun dispatchEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> =
         Mono.defer {
@@ -64,10 +64,11 @@ class EcommerceCDCEventDispatcherService(
 
     /**
      * Processes the transaction event by performing upsert operations on the transaction view.
-     * Updates event payload data and logs detailed event information.
+     * Updates event payload data using conditional logic based on timestamps and logs detailed 
+     * event information for monitoring and debugging purposes.
      *
-     * @param event The transaction change document
-     * @return Mono<Document> The processed document
+     * @param event The transaction event to process
+     * @return Mono<TransactionEvent<*>> The processed transaction event
      */
     private fun processTransactionEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> {
         val eventId = event.id

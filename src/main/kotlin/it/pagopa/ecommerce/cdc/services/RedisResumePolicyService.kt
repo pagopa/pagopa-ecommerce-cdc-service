@@ -7,6 +7,13 @@ import java.time.temporal.ChronoUnit
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
+/**
+ * Redis-based implementation of the resume policy service for CDC change stream operations.
+ * 
+ * Manages timestamp persistence in Redis to support resumable MongoDB change stream processing.
+ * This allows the CDC service to resume from the last processed event after restarts or failures,
+ * ensuring no events are lost during service interruptions.
+ */
 @Service
 class RedisResumePolicyService(
     private val redisTemplate: TimestampRedisTemplate,

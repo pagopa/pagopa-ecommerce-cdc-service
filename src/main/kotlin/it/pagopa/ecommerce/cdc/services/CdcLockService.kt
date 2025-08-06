@@ -9,6 +9,13 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
 
+/**
+ * Service responsible for managing distributed locking mechanisms for CDC event processing.
+ * 
+ * Uses Redis-based distributed locks to prevent concurrent processing of the same event
+ * across multiple CDC service instances, ensuring data consistency and avoiding duplicate
+ * processing of transaction events.
+ */
 @Service
 class CdcLockService(
     private val redissonClient: RedissonReactiveClient,
