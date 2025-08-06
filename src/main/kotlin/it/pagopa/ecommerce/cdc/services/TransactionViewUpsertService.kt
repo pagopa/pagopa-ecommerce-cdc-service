@@ -218,7 +218,7 @@ class TransactionViewUpsertService(
         update["clientId"] = data.clientId
         update["creationDate"] = event.creationDate
         update["_class"] = Transaction::class.java.canonicalName
-      
+
         statusUpdate["email"] = data.email.opaqueData
         statusUpdate["paymentNotices"] = data.paymentNotices
         statusUpdate["clientId"] = data.clientId
@@ -289,7 +289,6 @@ class TransactionViewUpsertService(
 
                 statusUpdate["gatewayAuthorizationStatus"] = gatewayAuthData.outcome
                 statusUpdate["authorizationErrorCode"] = gatewayAuthData.errorCode
-
             }
 
             else ->
@@ -304,7 +303,6 @@ class TransactionViewUpsertService(
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
 
         return Pair(update, statusUpdate)
-
     }
 
     /**
@@ -352,7 +350,7 @@ class TransactionViewUpsertService(
     private fun updateClosedData(event: TransactionClosedEvent): Pair<Update?, Update> {
         val statusUpdate = Update()
         statusUpdate["sendPaymentResultOutcome"] = TransactionUserReceiptData.Outcome.NOT_RECEIVED
-        statusUpdate["closureErrorData"] = null
+        statusUpdate.unset("closureErrorData")
         statusUpdate["status"] =
             when (event.data.wasCanceledByUser) {
                 true -> TransactionStatusDto.CANCELED
@@ -456,7 +454,7 @@ class TransactionViewUpsertService(
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
 
         return Pair(null, statusUpdate)
-        // Doesn't update the state but it has to be processed coditionally on its timestamp
+        // Doesn't update the state, but it has to be processed coditionally on its timestamp
     }
 
     /** Updates fields for TRANSACTION_CLOSURE_FAILED_EVENT. Adds closure failure information. */
@@ -487,7 +485,7 @@ class TransactionViewUpsertService(
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
         return Pair(null, statusUpdate)
-        // Doesn't update the state but it has to be processed coditionally on its timestamp.
+        // Doesn't update the state, but it has to be processed coditionally on its timestamp.
         // Maybe it could be skipped
     }
 
