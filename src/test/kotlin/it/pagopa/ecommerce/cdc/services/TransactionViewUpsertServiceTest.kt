@@ -251,6 +251,7 @@ class TransactionViewUpsertServiceTest {
             TransactionTestUtils.transactionActivateEvent(
                 TransactionTestUtils.npgTransactionGatewayActivationData()
             )
+
         val queryByTransactionId =
             Query.query(Criteria.where("transactionId").`is`(event.transactionId))
 
