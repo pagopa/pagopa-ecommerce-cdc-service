@@ -402,6 +402,7 @@ class TransactionViewUpsertService(
         val statusUpdate = Update()
         statusUpdate["closureErrorData"] = event.data
         statusUpdate["status"] = TransactionStatusDto.CLOSURE_ERROR
+        statusUpdate["sendPaymentResultOutcome"] = TransactionUserReceiptData.Outcome.NOT_RECEIVED
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
         return Pair(null, statusUpdate)
