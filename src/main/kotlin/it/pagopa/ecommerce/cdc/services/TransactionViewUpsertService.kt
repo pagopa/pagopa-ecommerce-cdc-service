@@ -39,96 +39,79 @@ class TransactionViewUpsertService(
      * @param event The MongoDB change stream event document
      * @return Mono<Void> Completes when the upsert operation succeeds
      */
-    fun upsertEventData(event: TransactionEvent<*>): Mono<Unit> {
+    fun upsertEventData(event: TransactionEvent<*>): Mono<UpdateResult> {
         val eventCode = event.eventCode
         val transactionId = event.transactionId
-        return Mono.defer {
+
+        logger.debug(
+            "Upserting transaction view data for _id: [{}], eventCode: [{}]",
+            transactionId,
+            eventCode,
+        )
+        val queryByTransactionId = Query.query(Criteria.where("transactionId").`is`(transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        return buildUpdateFromEvent(event)
+            .flatMap { (update, updateStatus) ->
+                tryToUpdateExistingView(
+                        queryByTransactionAndLastProcessedEventAtCondition,
+                        queryByTransactionId,
+                        updateStatus,
+                        update,
+                    )
+                    .flatMap { updateResult ->
+                        if (updateResult.modifiedCount == 0L) {
+                            mongoTemplate
+                                .exists(
+                                    queryByTransactionId,
+                                    BaseTransactionView::class.java,
+                                    transactionViewName,
+                                )
+                                .flatMap {
+                                    if (!it) {
+                                        mongoTemplate
+                                            .upsert(
+                                                queryByTransactionAndLastProcessedEventAtCondition,
+                                                updateStatus,
+                                                BaseTransactionView::class.java,
+                                                transactionViewName,
+                                            )
+                                            .filter { it.upsertedId != null }
+                                    } else {
+                                        Mono.empty()
+                                    }
+                                }
+                        } else {
+                            Mono.just(updateResult)
+                        }
+                    }
+            }
+            .switchIfEmpty(
+                Mono.error {
+                    CdcQueryMatchException("Query didn't match any condition to update the view")
+                }
+            )
+            .doOnNext { updateResult ->
                 logger.debug(
-                    "Upserting transaction view data for _id: [{}], eventCode: [{}]",
+                    "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
                     transactionId,
                     eventCode,
-                )
-                val queryByTransactionId =
-                    Query.query(Criteria.where("transactionId").`is`(transactionId))
-
-                val queryByTransactionAndLastProcessedEventAtCondition =
-                    Query.query(
-                        Criteria.where("transactionId")
-                            .`is`(transactionId)
-                            .orOperator(
-                                Criteria.where("lastProcessedEventAt").exists(false),
-                                Criteria.where("lastProcessedEventAt")
-                                    .lt(
-                                        ZonedDateTime.parse(event.creationDate)
-                                            .toInstant()
-                                            .toEpochMilli()
-                                    ),
-                            )
-                    )
-
-                buildUpdateFromEvent(event)
-                    .flatMap { (update, updateStatus) ->
-                        tryToUpdateExistingView(
-                                queryByTransactionAndLastProcessedEventAtCondition,
-                                queryByTransactionId,
-                                updateStatus,
-                                update,
-                            )
-                            .switchIfEmpty( // insert
-                                mongoTemplate
-                                    .upsert(
-                                        queryByTransactionAndLastProcessedEventAtCondition,
-                                        updateStatus,
-                                        BaseTransactionView::class.java,
-                                        transactionViewName,
-                                    )
-                                    .filter { updateResult -> updateResult.upsertedId != null }
-                            )
-                    }
-                    .switchIfEmpty(
-                        Mono.error {
-                            CdcQueryMatchException(
-                                "Query didn't match any condition to update the view"
-                            )
-                        }
-                    )
-                    .doOnNext { updateResult ->
-                        logger.debug(
-                            "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
-                            transactionId,
-                            eventCode,
-                            updateResult.matchedCount,
-                            updateResult.modifiedCount,
-                            updateResult.upsertedId != null,
-                        )
-                    }
-                    .thenReturn(Unit)
-            }
-            .doOnSuccess { _ ->
-                logger.info("Successfully upserted transaction view for _id: [{}]", transactionId)
-            }
-            .doOnError { error ->
-                logger.error(
-                    "Failed to upsert transaction view for _id: [{}]",
-                    transactionId,
-                    error,
+                    updateResult.matchedCount,
+                    updateResult.modifiedCount,
+                    updateResult.upsertedId != null,
                 )
             }
     }
-
-    /*
-
-    .filter { updateResult ->
-                    updateResult.modifiedCount > 0
-                }.switchIfEmpty(
-                    Mono.error {
-                        CdcQueryMatchException(
-                            "Query didn't match any condition to update the view"
-                        )
-                    }
-                )
-
-     */
 
     private fun tryToUpdateExistingView(
         queryByTransactionAndLastProcessedEventAtCondition: Query,
@@ -138,22 +121,16 @@ class TransactionViewUpsertService(
     ): Mono<UpdateResult> {
         return when (update) {
             null ->
-                mongoTemplate
-                    .exists(
-                        queryByTransactionId,
-                        BaseTransactionView::class.java,
-                        transactionViewName,
-                    )
-                    .flatMap {
-                        mongoTemplate
-                            .updateFirst(
-                                queryByTransactionAndLastProcessedEventAtCondition,
-                                updateStatus,
-                                BaseTransactionView::class.java,
-                                transactionViewName,
-                            )
-                            .filter { updateResult -> it || updateResult.modifiedCount > 0 }
-                    }
+                mongoTemplate.updateFirst(
+                    queryByTransactionAndLastProcessedEventAtCondition,
+                    updateStatus,
+                    BaseTransactionView::class.java,
+                    transactionViewName,
+                )
+            // if only the status should be updated and it is going to fail because
+            // the lastProcessedEventAt is after the event creation date the filter
+            // should exclude all the existing document from the subsequent upsert.
+            // So the filter should return false if the document doesn't exist.
             else ->
                 mongoTemplate
                     .updateFirst(
@@ -162,25 +139,30 @@ class TransactionViewUpsertService(
                         BaseTransactionView::class.java,
                         transactionViewName,
                     )
-                    .filter { updateResult -> updateResult.modifiedCount > 0 }
-                    .switchIfEmpty(
-                        mongoTemplate.updateFirst(
-                            queryByTransactionId,
-                            update,
-                            BaseTransactionView::class.java,
-                            transactionViewName,
-                        )
-                    )
-                    .filter { updateResult -> updateResult.modifiedCount > 0 }
+                    .flatMap {
+                        if (it.modifiedCount == 0L) {
+                            mongoTemplate.updateFirst(
+                                queryByTransactionId,
+                                update,
+                                BaseTransactionView::class.java,
+                                transactionViewName,
+                            )
+                        } else {
+                            Mono.just(it)
+                        }
+                    }
         }
     }
 
     /**
-     * Builds MongoDB Update object based on the event type and content. Different events update
-     * different portions of the transaction view document.
+     * Builds a pair of MongoDB Update object based on the event type and content. Different events
+     * update different portions of the transaction view document. The first member can be null and
+     * contains update that doesn't need tobe matched against lastProcessedEventAt field in the view.
+     * The second one is not nullable and contains all updates about info to save and also status
+     * and lastProcessedEventAt field to update in the view.
      *
      * @param event The MongoDB change stream event document
-     * @return Update object with field updates based on event type
+     * @return Mono of a pair of update object with field updates based on event type.
      */
     private fun buildUpdateFromEvent(event: TransactionEvent<*>): Mono<Pair<Update?, Update>> {
         val eventCode = event.eventCode
