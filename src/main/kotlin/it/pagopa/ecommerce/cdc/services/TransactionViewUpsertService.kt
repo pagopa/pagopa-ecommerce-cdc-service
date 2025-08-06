@@ -304,20 +304,6 @@ class TransactionViewUpsertService(
     }
 
     /**
-     * Updates fields for TRANSACTION_CLOSURE_REQUESTED_EVENT. Adds closure information and outcome
-     * details.
-     */
-    private fun updateClosureRequestData(
-        event: TransactionClosureRequestedEvent
-    ): Pair<Update?, Update> {
-        val statusUpdate = Update()
-        statusUpdate["status"] = TransactionStatusDto.CLOSURE_REQUESTED
-        statusUpdate["lastProcessedEventAt"] =
-            ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(null, statusUpdate)
-    }
-
-    /**
      * Updates fields for TRANSACTION_USER_RECEIPT_REQUESTED_EVENT. Adds user receipt information.
      */
     private fun updateUserReceiptData(
@@ -397,6 +383,20 @@ class TransactionViewUpsertService(
         return Pair(null, statusUpdate)
     }
 
+    /**
+     * Updates fields for TRANSACTION_CLOSURE_REQUESTED_EVENT. Adds closure information and outcome
+     * details.
+     */
+    private fun updateClosureRequestData(
+        event: TransactionClosureRequestedEvent
+    ): Pair<Update?, Update> {
+        val statusUpdate = Update()
+        statusUpdate["status"] = TransactionStatusDto.CLOSURE_REQUESTED
+        statusUpdate["lastProcessedEventAt"] =
+            ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
+        return Pair(null, statusUpdate)
+    }
+
     /** Updates fields for TRANSACTION_CLOSURE_ERROR_EVENT. Adds closure error timestamp. */
     private fun updateClosureErrorData(event: TransactionClosureErrorEvent): Pair<Update?, Update> {
         val statusUpdate = Update()
@@ -451,10 +451,8 @@ class TransactionViewUpsertService(
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
 
-        return Pair(
-            null,
-            statusUpdate,
-        ) // Doesn't update the state but it has to be processed coditionally on its timestamp
+        return Pair(null, statusUpdate)
+        // Doesn't update the state but it has to be processed coditionally on its timestamp
     }
 
     /** Updates fields for TRANSACTION_CLOSURE_FAILED_EVENT. Adds closure failure information. */
@@ -484,10 +482,8 @@ class TransactionViewUpsertService(
         val statusUpdate = Update()
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(
-            null,
-            statusUpdate,
-        ) // Doesn't update the state but it has to be processed coditionally on its timestamp.
+        return Pair(null, statusUpdate)
+        // Doesn't update the state but it has to be processed coditionally on its timestamp.
         // Maybe it could be skipped
     }
 
@@ -500,10 +496,8 @@ class TransactionViewUpsertService(
         val statusUpdate = Update()
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
-        return Pair(
-            null,
-            statusUpdate,
-        ) // Doesn't update the state but it has to be processed coditionally on its timestamp.
+        return Pair(null, statusUpdate)
+        // Doesn't update the state but it has to be processed coditionally on its timestamp.
         // Maybe it could be skipped
     }
 }
