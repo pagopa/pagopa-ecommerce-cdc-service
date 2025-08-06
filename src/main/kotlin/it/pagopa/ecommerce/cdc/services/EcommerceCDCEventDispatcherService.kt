@@ -1,8 +1,8 @@
 package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
+import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
-import org.bson.Document
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -12,27 +12,30 @@ import reactor.util.retry.Retry
 /**
  * Service responsible for dispatching and processing transaction status change events.
  *
- * Currently implements logging-only functionality as per initial requirements. Future iterations
- * will add queue/topic publishing capabilities
+ * Processes CDC events by updating transaction views with event data using upsert operations.
+ * Handles event payload updates while maintaining retry logic and error handling.
  */
 @Component
-class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: RetrySendPolicyConfig) {
+class EcommerceCDCEventDispatcherService(
+    private val retrySendPolicyConfig: RetrySendPolicyConfig,
+    private val transactionViewUpsertService: TransactionViewUpsertService,
+) {
 
     private val logger: Logger = LoggerFactory.getLogger(javaClass)
 
     /**
-     * Dispatches a collection change event for processing. Currently logs the event details in
-     * structured format.
+     * Dispatches a collection change event for processing. Logs event details and performs upsert
+     * operations on the transaction view.
      *
      * @param event The MongoDB change stream document containing eventstore data
      * @return Mono<Document> The processed document
      */
-    fun dispatchEvent(event: Document): Mono<Document> =
+    fun dispatchEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> =
         Mono.defer {
                 // extract document fields
-                val transactionId = event.getString("transactionId") ?: "unknown"
-                val eventClass = event.getString("_class") ?: "unknown"
-                val creationDate = event.getString("creationDate") ?: "unknown"
+                val transactionId = event.transactionId
+                val eventClass = event.javaClass
+                val creationDate = event.creationDate
 
                 logger.info(
                     "Handling new change stream event: transactionId: [{}], eventType: [{}], creationDate: [{}]",
@@ -41,7 +44,6 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
                     creationDate,
                 )
 
-                // TODO tracing + send event to queue/topic
                 processTransactionEvent(event)
             }
             .retryWhen(
@@ -61,45 +63,43 @@ class EcommerceCDCEventDispatcherService(private val retrySendPolicyConfig: Retr
             .map { event }
 
     /**
-     * Processes the transaction event based on its type and content. Currently implements
-     * structured logging for all event types.
+     * Processes the transaction event by performing upsert operations on the transaction view.
+     * Updates event payload data and logs detailed event information.
      *
      * @param event The transaction change document
      * @return Mono<Document> The processed document
      */
-    private fun processTransactionEvent(event: Document): Mono<Document> {
-        return Mono.fromCallable {
-                val eventId = event.getString("_id")
-                val transactionId = event.getString("transactionId")
-                val eventCode = event.getString("eventCode")
-                val creationDate = event.getString("creationDate")
+    private fun processTransactionEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> {
+        val eventId = event.id
+        val transactionId = event.transactionId
+        val eventCode = event.eventCode
+        val creationDate = event.creationDate
 
-                // extract data from nested 'data' field if present
-                val data = event.get("data") as? Document
-                val paymentNotices = data?.get("paymentNotices") as? List<*>
-                val clientId = data?.getString("clientId")
+        logger.info(
+            "CDC Event Details: transactionId: [{}], eventId: [{}], eventCode: [{}], creationDate: [{}]",
+            transactionId,
+            eventId,
+            eventCode,
+            creationDate,
+        )
 
-                logger.info(
-                    "CDC Event Details: transactionId: [{}], eventId: [{}], eventCode: [{}], creationDate: [{}], clientId: [{}], paymentNotices: [{}]",
-                    transactionId,
-                    eventId,
-                    eventCode,
-                    creationDate,
-                    clientId,
-                    paymentNotices?.size ?: 0,
-                )
-
-                // TODO future iterations will add:
-                // - Queue/topic publishing
-                // - View updates with Redis caching
-
-                event
-            }
+        return transactionViewUpsertService
+            .upsertEventData(event)
             .doOnSuccess {
                 logger.debug(
-                    "Successfully processed eventstore event: [{}]",
-                    event.getString("_id"),
+                    "Successfully upserted transaction view for eventId: [{}], transactionId: [{}]",
+                    eventId,
+                    transactionId,
                 )
             }
+            .doOnError { error ->
+                logger.error(
+                    "Failed to upsert transaction view for eventId: [{}], transactionId: [{}]",
+                    eventId,
+                    transactionId,
+                    error,
+                )
+            }
+            .then(Mono.just(event))
     }
 }

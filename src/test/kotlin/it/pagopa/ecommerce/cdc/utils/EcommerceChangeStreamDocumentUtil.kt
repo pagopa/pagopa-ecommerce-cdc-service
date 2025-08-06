@@ -1,9 +1,11 @@
 package it.pagopa.ecommerce.cdc.utils
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.mongodb.client.model.changestream.ChangeStreamDocument
 import com.mongodb.client.model.changestream.OperationType
+import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
+import it.pagopa.ecommerce.commons.v2.TransactionTestUtils
 import java.time.ZonedDateTime
-import org.bson.BsonDocument
 import org.bson.Document
 import org.mockito.Mockito.lenient
 import org.mockito.kotlin.mock
@@ -13,63 +15,37 @@ import org.springframework.data.mongodb.core.ChangeStreamEvent
 /** Utility class for creating test documents and change stream events for ecommerce CDC testing. */
 object EcommerceChangeStreamDocumentUtil {
 
-    private const val TEST_TRANSACTION_ID_1 = "93cce28d3b7c4cb9975e6d856ecee89f"
-    private const val TEST_EVENT_ID_1 = "event_93cce28d3b7c4cb9975e6d856ecee89f"
-    private const val TEST_PAYMENT_TOKEN_1 = "payment_token_93cce28d3b7c4cb9975e6d856ecee89f"
+    private val objectMapper = ObjectMapper()
 
     /** Creates a sample eventstore document for testing purposes. */
-    fun createSampleTransactionDocument(
-        eventId: String = TEST_EVENT_ID_1,
-        transactionId: String = TEST_TRANSACTION_ID_1,
-        eventCode: String = "TRANSACTION_ACTIVATED_EVENT",
-        eventClass: String = "it.pagopa.ecommerce.commons.documents.v2.TransactionActivatedEvent",
-        creationDate: String? = ZonedDateTime.now().toString(),
-    ): Document {
-        return Document().apply {
-            put("_id", eventId)
-            put("transactionId", transactionId)
-            put("eventCode", eventCode)
-            put("_class", eventClass)
-            put("creationDate", creationDate)
-            put(
-                "data",
-                Document().apply {
-                    put("email", Document().apply { put("data", "test@example.com") })
-                    put(
-                        "paymentNotices",
-                        listOf(
-                            Document().apply {
-                                put("paymentToken", TEST_PAYMENT_TOKEN_1)
-                                put("amount", 1000)
-                                put("description", "Test payment")
-                            }
-                        ),
-                    )
-                    put("clientId", "CHECKOUT")
-                    put("paymentTokenValiditySeconds", 900)
-                },
-            )
+    fun createSampleEventStoreEvent(
+        eventId: String = TransactionTestUtils.TRANSACTION_ID,
+        creationDate: ZonedDateTime = ZonedDateTime.now(),
+    ): TransactionEvent<*> {
+
+        return TransactionTestUtils.transactionActivateEvent().apply {
+            this.transactionId = eventId
+            this.creationDate = creationDate.toString()
         }
     }
+
+    fun toDocument(value: Any): Document = Document.parse(objectMapper.writeValueAsString(value))
 
     /** Creates a mock ChangeStreamEvent for testing purposes using Mockito. */
     fun createMockChangeStreamEvent(
         operationType: String = "insert",
-        fullDocument: Document? = null,
-    ): ChangeStreamEvent<BsonDocument> {
-        val document = fullDocument ?: createSampleTransactionDocument()
-
-        val mockEvent = mock<ChangeStreamEvent<BsonDocument>>()
+        event: TransactionEvent<*>,
+    ): ChangeStreamEvent<TransactionEvent<*>> {
+        val document = toDocument(event)
+        val mockEvent = mock<ChangeStreamEvent<TransactionEvent<Any>>>()
         val mockRaw = mock<ChangeStreamDocument<Document>>()
-
         lenient().whenever(mockRaw.fullDocument).thenReturn(document)
-
         lenient()
             .whenever(mockEvent.operationType)
             .thenReturn(OperationType.valueOf(operationType.uppercase()))
         lenient().whenever(mockEvent.raw).thenReturn(mockRaw)
-
-        return mockEvent
+        lenient().whenever(mockEvent.body).thenReturn(event as TransactionEvent<Any>)
+        return mockEvent as ChangeStreamEvent<TransactionEvent<*>>
     }
 
     /**
@@ -77,8 +53,8 @@ object EcommerceChangeStreamDocumentUtil {
      */
     fun createMockChangeStreamEventWithNullDocument(
         operationType: String = "insert"
-    ): ChangeStreamEvent<BsonDocument> {
-        val mockEvent = mock<ChangeStreamEvent<BsonDocument>>()
+    ): ChangeStreamEvent<TransactionEvent<*>> {
+        val mockEvent = mock<ChangeStreamEvent<TransactionEvent<*>>>()
         val mockRaw = mock<ChangeStreamDocument<Document>>()
 
         lenient().whenever(mockRaw.fullDocument).thenReturn(null)

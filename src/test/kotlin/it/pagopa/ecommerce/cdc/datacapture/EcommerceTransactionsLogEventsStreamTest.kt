@@ -6,29 +6,19 @@ import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
 import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
-import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
+import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent
+import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createMockChangeStreamEventWithNullDocument
+import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent
+import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
 import java.time.Instant
 import java.time.ZonedDateTime
-import org.bson.BsonDocument
-import org.bson.Document
-import org.junit.jupiter.api.BeforeEach
+import kotlin.test.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mockito
 import org.mockito.junit.jupiter.MockitoExtension
-import org.mockito.kotlin.any
-import org.mockito.kotlin.doNothing
-import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.eq
-import org.mockito.kotlin.given
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.never
-import org.mockito.kotlin.spy
-import org.mockito.kotlin.times
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
-import org.springframework.boot.context.event.ApplicationReadyEvent
+import org.mockito.kotlin.*
 import org.springframework.data.mongodb.core.ChangeStreamOptions
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import reactor.core.publisher.Flux
@@ -38,14 +28,9 @@ import reactor.test.StepVerifier
 @ExtendWith(MockitoExtension::class)
 class EcommerceTransactionsLogEventsStreamTest {
 
-    companion object {
-        private const val TEST_TRANSACTION_ID_1 = "93cce28d3b7c4cb9975e6d856ecee89f"
-        private const val TEST_TRANSACTION_ID_2 = "a1b2c3d4e5f6789012345678901234ab"
-    }
-
     private val reactiveMongoTemplate = Mockito.mock<ReactiveMongoTemplate>()
     private val cdcLockService: CdcLockService = mock()
-    private val redisResumePolicyService: RedisResumePolicyService = mock()
+
     private val ecommerceCDCEventDispatcherService =
         Mockito.mock<EcommerceCDCEventDispatcherService>()
     private val changeStreamOptionsConfig =
@@ -57,150 +42,100 @@ class EcommerceTransactionsLogEventsStreamTest {
     private val retryStreamPolicyConfig =
         RetryStreamPolicyConfig(maxAttempts = 3, intervalInMs = 1000)
     private val saveInterval = 10
+    private val redisResumePolicyService: RedisResumePolicyService = mock()
 
-    private lateinit var ecommerceTransactionsLogEventsStream: EcommerceTransactionsLogEventsStream
-
-    @BeforeEach
-    fun setup() {
-        whenever(redisResumePolicyService.getResumeTimestamp()).thenReturn(Instant.now())
-
-        ecommerceTransactionsLogEventsStream =
-            EcommerceTransactionsLogEventsStream(
-                reactiveMongoTemplate,
-                changeStreamOptionsConfig,
-                ecommerceCDCEventDispatcherService,
-                retryStreamPolicyConfig,
-                cdcLockService,
-                redisResumePolicyService,
-                saveInterval,
-            )
-    }
+    private val ecommerceTransactionsLogEventsStream: EcommerceTransactionsLogEventsStream =
+        EcommerceTransactionsLogEventsStream(
+            reactiveMongoTemplate,
+            changeStreamOptionsConfig,
+            ecommerceCDCEventDispatcherService,
+            retryStreamPolicyConfig,
+            cdcLockService,
+            redisResumePolicyService,
+            saveInterval,
+        )
 
     @Test
-    fun `should start change stream on application run and process one event`() {
-        val sampleDocument = EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument()
-        val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                operationType = "insert",
-                fullDocument = sampleDocument,
-            )
-
-        val mockFlux = Flux.just(changeStreamEvent)
-
+    fun `should successfully process change stream events`() {
+        val event = createSampleEventStoreEvent()
+        val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .willReturn(mockFlux)
+            .willReturn(Flux.just(changeStreamEvent))
 
         given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
-        given(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
-            .willReturn(Mono.just(sampleDocument))
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(any())).willReturn(Mono.just(event))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
-        StepVerifier.create(result).expectNext(sampleDocument).verifyComplete()
-
-        verify(reactiveMongoTemplate, times(1))
-            .changeStream(
-                eq("eventstore"),
-                any<ChangeStreamOptions>(),
-                eq(BsonDocument::class.java),
-            )
-
-        verify(cdcLockService, times(1)).acquireEventLock(any())
-        verify(ecommerceCDCEventDispatcherService, times(1)).dispatchEvent(eq(sampleDocument))
-    }
-
-    @Test
-    fun `should successfully process change stream events`() {
-        val sampleDocument = EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument()
-        val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                operationType = "insert",
-                fullDocument = sampleDocument,
-            )
-
-        whenever(
-                reactiveMongoTemplate.changeStream(
-                    any<String>(),
-                    any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
-                )
-            )
-            .thenReturn(Flux.just(changeStreamEvent))
-
-        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
-
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
-            .thenReturn(Mono.just(sampleDocument))
-
-        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
-
-        StepVerifier.create(result).expectNext(sampleDocument).verifyComplete()
+        StepVerifier.create(result).expectNext(event).verifyComplete()
 
         verify(cdcLockService).acquireEventLock(any())
-        verify(ecommerceCDCEventDispatcherService).dispatchEvent(sampleDocument)
+        verify(ecommerceCDCEventDispatcherService).dispatchEvent(event)
     }
 
     @Test
     fun `should handle MongoDB connection errors with retry`() {
         val mongoException = MongoException("Connection failed")
-        val sampleDocument = EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument()
-        val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                operationType = "insert",
-                fullDocument = sampleDocument,
-            )
+        val event = createSampleEventStoreEvent()
+        val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
-        whenever(
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.error(mongoException))
-            .thenReturn(Flux.just(changeStreamEvent))
+            .willReturn(Flux.error(mongoException))
+            .willReturn(Flux.just(changeStreamEvent))
 
-        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+        given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(sampleDocument))
-            .thenReturn(Mono.just(sampleDocument))
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(any())).willReturn(Mono.just(event))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
-        StepVerifier.create(result).expectNext(sampleDocument).verifyComplete()
+        StepVerifier.create(result).expectNext(event).verifyComplete()
 
         verify(reactiveMongoTemplate, times(2))
             .changeStream(
                 eq("eventstore"),
                 any<ChangeStreamOptions>(),
-                eq(BsonDocument::class.java),
+                eq(TransactionEvent::class.java),
             )
         verify(cdcLockService).acquireEventLock(any())
-        verify(ecommerceCDCEventDispatcherService).dispatchEvent(sampleDocument)
+        verify(ecommerceCDCEventDispatcherService)
+            .dispatchEvent(
+                argThat { dispatchedEvent ->
+                    assertEquals(dispatchedEvent, event)
+                    true
+                }
+            )
     }
 
     @Test
     fun `should handle null documents gracefully`() {
         val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEventWithNullDocument(
-                operationType = "insert"
-            )
+            createMockChangeStreamEventWithNullDocument(operationType = "insert")
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
-        whenever(
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.just(changeStreamEvent))
+            .willReturn(Flux.just(changeStreamEvent))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
@@ -211,96 +146,83 @@ class EcommerceTransactionsLogEventsStreamTest {
 
     @Test
     fun `should handle event dispatcher errors gracefully`() {
-        val sampleDocument = EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument()
-        val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                operationType = "insert",
-                fullDocument = sampleDocument,
-            )
+        val event = createSampleEventStoreEvent()
+        val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
-        whenever(
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.just(changeStreamEvent))
+            .willReturn(Flux.just(changeStreamEvent))
 
-        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+        given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(sampleDocument))
-            .thenReturn(Mono.error(RuntimeException("Event processing failed")))
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(event))
+            .willReturn(Mono.error(RuntimeException("Event processing failed")))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
         StepVerifier.create(result).verifyComplete()
 
         verify(cdcLockService).acquireEventLock(any())
-        verify(ecommerceCDCEventDispatcherService).dispatchEvent(sampleDocument)
+        verify(ecommerceCDCEventDispatcherService).dispatchEvent(event)
     }
 
     @Test
     fun `should process multiple events in sequence`() {
-        val document1 =
-            EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
-                transactionId = TEST_TRANSACTION_ID_1,
-                eventCode = "TRANSACTION_ACTIVATED_EVENT",
-            )
-        val document2 =
-            EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
-                transactionId = TEST_TRANSACTION_ID_2,
-                eventCode = "TRANSACTION_AUTHORIZATION_REQUESTED_EVENT",
-            )
+        val event1 = createSampleEventStoreEvent(eventId = "event1")
+        val event2 = createSampleEventStoreEvent(eventId = "event2")
 
-        val event1 =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                operationType = "insert",
-                fullDocument = document1,
-            )
-        val event2 =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                operationType = "update",
-                fullDocument = document2,
-            )
+        val changeStreamEvent1 =
+            createMockChangeStreamEvent(operationType = "insert", event = event1)
+        val changeStreamEvent2 =
+            createMockChangeStreamEvent(operationType = "update", event = event2)
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
-        whenever(
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.just(event1, event2))
+            .willReturn(Flux.just(changeStreamEvent1, changeStreamEvent2))
 
-        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+        given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(document1))
-            .thenReturn(Mono.just(document1))
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(document2))
-            .thenReturn(Mono.just(document2))
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(event1))
+            .willReturn(Mono.just(event1))
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(event2))
+            .willReturn(Mono.just(event2))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
-        StepVerifier.create(result).expectNext(document1).expectNext(document2).verifyComplete()
+        StepVerifier.create(result).expectNext(event1).expectNext(event2).verifyComplete()
 
         verify(cdcLockService, times(2)).acquireEventLock(any())
-        verify(ecommerceCDCEventDispatcherService).dispatchEvent(document1)
-        verify(ecommerceCDCEventDispatcherService).dispatchEvent(document2)
+        verify(ecommerceCDCEventDispatcherService).dispatchEvent(event1)
+        verify(ecommerceCDCEventDispatcherService).dispatchEvent(event2)
+        verify(cdcLockService, times(1)).acquireEventLock(event1.id)
+        verify(cdcLockService, times(1)).acquireEventLock(event2.id)
     }
 
     @Test
     fun `should exhaust retry attempts for persistent MongoDB errors`() {
         val mongoException = MongoException("Persistent connection error")
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
-        whenever(
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.error(mongoException))
+            .willReturn(Flux.error(mongoException))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
@@ -312,22 +234,23 @@ class EcommerceTransactionsLogEventsStreamTest {
             .changeStream(
                 eq("eventstore"),
                 any<ChangeStreamOptions>(),
-                eq(BsonDocument::class.java),
+                eq(TransactionEvent::class.java),
             )
     }
 
     @Test
     fun `should not retry for non-MongoDB exceptions`() {
         val runtimeException = RuntimeException("Non-MongoDB error")
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
-        whenever(
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.error(runtimeException))
+            .willReturn(Flux.error(runtimeException))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
@@ -339,29 +262,29 @@ class EcommerceTransactionsLogEventsStreamTest {
             .changeStream(
                 eq("eventstore"),
                 any<ChangeStreamOptions>(),
-                eq(BsonDocument::class.java),
+                eq(TransactionEvent::class.java),
             )
     }
 
     @Test
     fun `should not process event when lock acquisition fails`() {
-        val sampleDocument = EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument()
         val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
+            createMockChangeStreamEvent(
                 operationType = "insert",
-                fullDocument = sampleDocument,
+                event = createSampleEventStoreEvent(),
             )
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
-        whenever(
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.just(changeStreamEvent))
+            .willReturn(Flux.just(changeStreamEvent))
 
-        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(false))
+        given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(false))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
@@ -373,24 +296,24 @@ class EcommerceTransactionsLogEventsStreamTest {
 
     @Test
     fun `should handle lock acquisition errors gracefully`() {
-        val sampleDocument = EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument()
         val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
+            createMockChangeStreamEvent(
                 operationType = "insert",
-                fullDocument = sampleDocument,
+                event = createSampleEventStoreEvent(),
             )
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
 
-        whenever(
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.just(changeStreamEvent))
+            .willReturn(Flux.just(changeStreamEvent))
 
-        whenever(cdcLockService.acquireEventLock(any()))
-            .thenReturn(Mono.error(RuntimeException("Lock service error")))
+        given(cdcLockService.acquireEventLock(any()))
+            .willReturn(Mono.error(RuntimeException("Lock service error")))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
@@ -401,52 +324,39 @@ class EcommerceTransactionsLogEventsStreamTest {
     }
 
     @Test
-    fun `should execute doOnComplete callback when stream completes in onApplicationEvent method`() {
-        val spy = spy(ecommerceTransactionsLogEventsStream)
-        val mockEvent = Mockito.mock<ApplicationReadyEvent>()
-
-        doReturn(Flux.empty<Document>()).whenever(spy).streamEcommerceTransactionsLogEvents()
-
-        spy.onApplicationEvent(mockEvent)
-
-        verify(spy).streamEcommerceTransactionsLogEvents()
-    }
-
-    @Test
     fun `should save resume token at save interval boundary`() {
         // Create test documents with timestamps
-        val documents =
+        val startDate = ZonedDateTime.now()
+        val events =
             (1..12).map { i ->
-                EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
+                createSampleEventStoreEvent(
                     eventId = "event_$i",
-                    creationDate = "2024-01-15T10:30:0${i % 10}.123Z",
+                    creationDate = startDate + Duration.ofSeconds(i.toLong()),
                 )
             }
 
         val changeStreamEvents =
-            documents.map { document ->
-                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                    operationType = "insert",
-                    fullDocument = document,
-                )
+            events.map { event ->
+                createMockChangeStreamEvent(operationType = "insert", event = event)
             }
 
-        whenever(
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.fromIterable(changeStreamEvents))
+            .willReturn(Flux.fromIterable(changeStreamEvents))
 
-        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+        given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any())).thenAnswer {
-            Mono.just(it.arguments[0] as Document)
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(any())).willAnswer {
+            Mono.just(it.arguments[0])
         }
 
-        doNothing().whenever(redisResumePolicyService).saveResumeTimestamp(any())
+        doNothing().`when`(redisResumePolicyService).saveResumeTimestamp(any())
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
@@ -455,56 +365,13 @@ class EcommerceTransactionsLogEventsStreamTest {
         // With saveInterval = 10, resume token should be saved only at positions 9 and 19
         // (0-based indexing: 9 = 10th element, 19 = 20th element)
         // Since we only have 12 elements, only position 9 should trigger save
-        verify(redisResumePolicyService, times(1)).saveResumeTimestamp(any())
+        verify(redisResumePolicyService, times(1))
+            .saveResumeTimestamp(ZonedDateTime.parse(events[9].creationDate).toInstant())
     }
 
     @Test
     fun `should not save resume token when not at interval boundary`() {
-        // Create test documents - only 5 elements, so with saveInterval = 10, no saves should occur
-        val documents =
-            (1..5).map { i ->
-                EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
-                    eventId = "event_$i",
-                    creationDate = "2024-01-15T10:30:0${i}.123Z",
-                )
-            }
-
-        val changeStreamEvents =
-            documents.map { document ->
-                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                    operationType = "insert",
-                    fullDocument = document,
-                )
-            }
-
-        whenever(
-                reactiveMongoTemplate.changeStream(
-                    any<String>(),
-                    any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
-                )
-            )
-            .thenReturn(Flux.fromIterable(changeStreamEvents))
-
-        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
-
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any())).thenAnswer {
-            Mono.just(it.arguments[0] as Document)
-        }
-
-        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
-
-        StepVerifier.create(result).expectNextCount(5).verifyComplete()
-
-        // With saveInterval = 10 and only 5 elements, no saves should occur
-        // (positions 0-4 don't trigger saves, need position 9 for first save)
-        verify(redisResumePolicyService, never()).saveResumeTimestamp(any())
-    }
-
-    @Test
-    fun `should handle null and blank timestamps in save token`() {
-        // Create a custom stream with saveInterval = 3 for easier testing
-        val customStream =
+        val logEventStream =
             EcommerceTransactionsLogEventsStream(
                 reactiveMongoTemplate,
                 changeStreamOptionsConfig,
@@ -512,67 +379,46 @@ class EcommerceTransactionsLogEventsStreamTest {
                 retryStreamPolicyConfig,
                 cdcLockService,
                 redisResumePolicyService,
-                3, // saveInterval = 3
+                10,
             )
-
-        // Create documents with null, empty, and blank creationDate timestamps
-        val documentWithNull =
-            EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
-                eventId = "event_null",
-                creationDate = null,
-            )
-        val documentWithEmpty =
-            EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
-                eventId = "event_empty",
-                creationDate = "",
-            )
-        val documentWithBlank =
-            EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
-                eventId = "event_blank",
-                creationDate = "   ",
-            )
+        // Create test documents - only 5 elements, so with saveInterval = 10, no saves should occur
+        val startDate = ZonedDateTime.now()
+        val events =
+            (1..5).map { i ->
+                createSampleEventStoreEvent(
+                    eventId = "event_$i",
+                    creationDate = startDate + Duration.ofSeconds(1.toLong()),
+                )
+            }
 
         val changeStreamEvents =
-            listOf(
-                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                    "insert",
-                    documentWithNull,
-                ),
-                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                    "insert",
-                    documentWithEmpty,
-                ),
-                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                    "insert",
-                    documentWithBlank,
-                ),
-            )
+            events.map { event ->
+                createMockChangeStreamEvent(operationType = "insert", event = event)
+            }
 
-        whenever(
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.fromIterable(changeStreamEvents))
+            .willReturn(Flux.fromIterable(changeStreamEvents))
 
-        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+        given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any())).thenAnswer {
-            Mono.just(it.arguments[0] as Document)
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(any())).willAnswer {
+            Mono.just(it.arguments[0])
         }
 
-        doNothing().whenever(redisResumePolicyService).saveResumeTimestamp(any())
+        val result = logEventStream.streamEcommerceTransactionsLogEvents()
 
-        val result = customStream.streamEcommerceTransactionsLogEvents()
+        StepVerifier.create(result).expectNextCount(5).verifyComplete()
 
-        StepVerifier.create(result).expectNextCount(3).verifyComplete()
-
-        // With saveInterval = 3, the 3rd element (index 2) should trigger save
-        // Even with null/empty/blank timestamps, save should still occur using Instant.now()
-        // fallback
-        verify(redisResumePolicyService, times(1)).saveResumeTimestamp(any())
+        // With saveInterval = 10 and only 5 elements, no saves should occur
+        // (positions 0-4 don't trigger saves, need position 9 for first save)
+        verify(redisResumePolicyService, never()).saveResumeTimestamp(any())
     }
 
     @Test
@@ -589,40 +435,32 @@ class EcommerceTransactionsLogEventsStreamTest {
                 1, // saveInterval = 1
             )
 
-        val expectedTimestamp = "2025-01-01T00:00:00.000000000Z[GMT]"
-        val expectedInstant = ZonedDateTime.parse(expectedTimestamp).toInstant()
+        val expectedTimestamp = ZonedDateTime.parse("2025-01-01T00:00:00.000000000Z[GMT]")
+        val expectedInstant = expectedTimestamp.toInstant()
 
-        val document =
-            EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
-                eventId = "event_with_timestamp",
-                creationDate = expectedTimestamp,
-            )
+        val event = createSampleEventStoreEvent(creationDate = expectedTimestamp)
 
-        val changeStreamEvent =
-            EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                operationType = "insert",
-                fullDocument = document,
-            )
+        val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
 
-        whenever(
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.just(changeStreamEvent))
+            .willReturn(Flux.just(changeStreamEvent))
 
-        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+        given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any()))
-            .thenReturn(Mono.just(document))
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(any())).willReturn(Mono.just(event))
 
-        doNothing().whenever(redisResumePolicyService).saveResumeTimestamp(any())
+        doNothing().`when`(redisResumePolicyService).saveResumeTimestamp(any())
 
         val result = customStream.streamEcommerceTransactionsLogEvents()
 
-        StepVerifier.create(result).expectNext(document).verifyComplete()
+        StepVerifier.create(result).expectNext(event).verifyComplete()
 
         // Verify that saveResumeTimestamp was called exactly once with the expected timestamp
         verify(redisResumePolicyService, times(1)).saveResumeTimestamp(eq(expectedInstant))
@@ -641,41 +479,39 @@ class EcommerceTransactionsLogEventsStreamTest {
                 redisResumePolicyService,
                 1, // saveInterval = 1
             )
-
-        val documents =
+        val startDate = ZonedDateTime.now()
+        val events =
             (1..3).map { i ->
-                EcommerceChangeStreamDocumentUtil.createSampleTransactionDocument(
+                createSampleEventStoreEvent(
                     eventId = "event_$i",
-                    creationDate = "2024-01-15T10:30:0${i}.123Z",
+                    creationDate = startDate + Duration.ofSeconds(1),
                 )
             }
 
         val changeStreamEvents =
-            documents.map { document ->
-                EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent(
-                    operationType = "insert",
-                    fullDocument = document,
-                )
+            events.map { event ->
+                createMockChangeStreamEvent(operationType = "insert", event = event)
             }
 
-        whenever(
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
                     any<ChangeStreamOptions>(),
-                    eq(BsonDocument::class.java),
+                    eq(TransactionEvent::class.java),
                 )
             )
-            .thenReturn(Flux.fromIterable(changeStreamEvents))
+            .willReturn(Flux.fromIterable(changeStreamEvents))
 
-        whenever(cdcLockService.acquireEventLock(any())).thenReturn(Mono.just(true))
+        given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
-        whenever(ecommerceCDCEventDispatcherService.dispatchEvent(any())).thenAnswer {
-            Mono.just(it.arguments[0] as Document)
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(any())).willAnswer {
+            Mono.just(it.arguments[0])
         }
 
         // Mock saveResumeTimestamp to throw an exception
-        whenever(redisResumePolicyService.saveResumeTimestamp(any()))
-            .thenThrow(RuntimeException("Redis connection error"))
+        given(redisResumePolicyService.saveResumeTimestamp(any()))
+            .willThrow(RuntimeException("Redis connection error"))
 
         val result = customStream.streamEcommerceTransactionsLogEvents()
 
