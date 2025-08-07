@@ -22,6 +22,15 @@ import reactor.core.publisher.Mono
 /**
  * Service for performing upsert operations on transaction views with efficient atomic upsert
  * operations using native MongoDB queries.
+ *
+ * This service implements the core CDC logic for maintaining materialized transaction views by
+ * processing transaction events and updating view documents with conditional logic based on event
+ * timestamps. The service ensures data consistency through:
+ * - Conditional status updates that respect event chronological order (prevents out-of-order
+ *   overwrites)
+ * - Atomic upsert operations that handle both new document creation and existing document updates
+ * - Event-specific field mapping that populates view documents with appropriate transaction data
+ * - Error handling and logging for debugging and monitoring CDC operations
  */
 @Service
 class TransactionViewUpsertService(
@@ -224,14 +233,19 @@ class TransactionViewUpsertService(
     }
 
     /**
-     * Builds a pair of MongoDB Update object based on the event type and content. Different events
+     * Builds a pair of MongoDB Update objects based on the event type and content. Different events
      * update different portions of the transaction view document. The first member can be null and
-     * contains update that doesn't need tobe matched against lastProcessedEventAt field in the
-     * view. The second one is not nullable and contains all updates about info to save and also
+     * contains updates that don't need to be matched against the lastProcessedEventAt field in the
+     * view. The second member is not nullable and contains all updates about info to save and also
      * status and lastProcessedEventAt field to update in the view.
      *
-     * @param event The MongoDB change stream event document
-     * @return Mono of a pair of update object with field updates based on event type.
+     * This method implements the conditional update strategy where:
+     * - Event data is updated regardless of timestamp if the event being processed contains more
+     *   info than the current one
+     * - Status updates are conditional based on event chronological order
+     *
+     * @param event The transaction event containing update data and metadata
+     * @return Mono of a pair of update objects with field updates based on event type
      */
     private fun buildUpdateFromEvent(event: TransactionEvent<*>): Mono<Pair<Update?, Update>> {
         val eventCode = event.eventCode

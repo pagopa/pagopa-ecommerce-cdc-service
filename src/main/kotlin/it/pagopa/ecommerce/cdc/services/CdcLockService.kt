@@ -23,6 +23,19 @@ class CdcLockService(
 ) {
     private val logger: Logger = LoggerFactory.getLogger(javaClass)
 
+    /**
+     * Attempts to acquire a distributed lock for processing a specific transaction event.
+     *
+     * This method uses Redis-based distributed locking to ensure that each transaction event is
+     * processed by only one CDC service instance at a time. The lock acquisition includes a
+     * configurable wait time and TTL to handle various failure scenarios.
+     *
+     * @param eventId The unique identifier of the transaction event to lock
+     * @return Mono<Boolean> that emits true if lock was acquired, false if not available, or error
+     *   if acquisition fails
+     * @throws CdcEventProcessingLockNotAcquiredException if lock acquisition fails due to Redis
+     *   errors
+     */
     fun acquireEventLock(eventId: String): Mono<Boolean> {
         logger.debug("Trying to acquire lock for event: {}", eventId)
         return Mono.defer {
