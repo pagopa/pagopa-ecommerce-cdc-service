@@ -351,6 +351,7 @@ class TransactionViewUpsertServiceTest {
                     assertEquals(event.data.paymentTypeCode, setDocument["paymentTypeCode"])
                     assertEquals(event.data.pspId, setDocument["pspId"])
                     assertEquals(event.data.fee, setDocument["feeTotal"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -434,6 +435,7 @@ class TransactionViewUpsertServiceTest {
                     assertEquals(event.data.paymentTypeCode, setDocument["paymentTypeCode"])
                     assertEquals(event.data.pspId, setDocument["pspId"])
                     assertEquals(event.data.fee, setDocument["feeTotal"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -494,6 +496,7 @@ class TransactionViewUpsertServiceTest {
                     assertEquals(event.data.paymentTypeCode, setDocument["paymentTypeCode"])
                     assertEquals(event.data.pspId, setDocument["pspId"])
                     assertEquals(event.data.fee, setDocument["feeTotal"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -517,6 +520,7 @@ class TransactionViewUpsertServiceTest {
                     assertEquals(event.data.paymentTypeCode, setDocument["paymentTypeCode"])
                     assertEquals(event.data.pspId, setDocument["pspId"])
                     assertEquals(event.data.fee, setDocument["feeTotal"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -589,6 +593,7 @@ class TransactionViewUpsertServiceTest {
                         expectedAuthorizationErrorCode,
                         setDocument["authorizationErrorCode"],
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -667,6 +672,7 @@ class TransactionViewUpsertServiceTest {
                         expectedAuthorizationErrorCode,
                         setDocument["authorizationErrorCode"],
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -688,6 +694,7 @@ class TransactionViewUpsertServiceTest {
                         expectedAuthorizationErrorCode,
                         setDocument["authorizationErrorCode"],
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -779,6 +786,7 @@ class TransactionViewUpsertServiceTest {
                         expectedAuthorizationErrorCode,
                         setDocument["authorizationErrorCode"],
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -800,6 +808,7 @@ class TransactionViewUpsertServiceTest {
                         expectedAuthorizationErrorCode,
                         setDocument["authorizationErrorCode"],
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -828,6 +837,7 @@ class TransactionViewUpsertServiceTest {
                         expectedAuthorizationErrorCode,
                         setDocument["authorizationErrorCode"],
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -886,6 +896,7 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -952,6 +963,7 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1031,6 +1043,7 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1061,6 +1074,7 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1137,6 +1151,7 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1167,6 +1182,7 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1228,6 +1244,7 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1304,6 +1321,7 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1380,6 +1398,7 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1465,6 +1484,7 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1495,6 +1515,7 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1562,6 +1583,7 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1632,6 +1654,7 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1712,6 +1735,7 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1737,6 +1761,7 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1799,6 +1824,7 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1873,6 +1899,7 @@ class TransactionViewUpsertServiceTest {
                         sendPaymentResultOutcome,
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1961,6 +1988,7 @@ class TransactionViewUpsertServiceTest {
                         sendPaymentResultOutcome,
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1976,6 +2004,7 @@ class TransactionViewUpsertServiceTest {
                         sendPaymentResultOutcome,
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -2003,6 +2032,7 @@ class TransactionViewUpsertServiceTest {
                         sendPaymentResultOutcome,
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -2066,6 +2096,7 @@ class TransactionViewUpsertServiceTest {
                         sendPaymentResultOutcome,
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -2086,6 +2117,7 @@ class TransactionViewUpsertServiceTest {
                         sendPaymentResultOutcome,
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -2165,6 +2197,7 @@ class TransactionViewUpsertServiceTest {
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 any(),
@@ -2187,6 +2220,7 @@ class TransactionViewUpsertServiceTest {
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
