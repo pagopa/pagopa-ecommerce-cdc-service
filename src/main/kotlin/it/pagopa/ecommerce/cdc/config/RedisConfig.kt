@@ -12,9 +12,27 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer
 import org.springframework.data.redis.serializer.StringRedisSerializer
 
+/**
+ * Redis configuration for the CDC service.
+ *
+ * Configures Redis connectivity and serialization for timestamp-based resume policy operations.
+ * This configuration supports the CDC service's ability to resume MongoDB change stream processing
+ * from the last successfully processed event timestamp.
+ */
 @Configuration
 class RedisConfig {
 
+    /**
+     * Creates a Redis template configured for storing and retrieving Instant timestamps.
+     *
+     * The template is specifically configured for the CDC service's resume policy functionality,
+     * allowing the service to persist and retrieve the last processed event timestamp to/from
+     * Redis.
+     *
+     * @param redisConnectionFactory The Redis connection factory provided by Spring Boot
+     *   autoconfiguration
+     * @return RedisTemplate<String, Instant> configured for timestamp operations
+     */
     @Bean
     fun redisTemplate(
         redisConnectionFactory: RedisConnectionFactory
