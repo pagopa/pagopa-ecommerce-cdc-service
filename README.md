@@ -185,15 +185,15 @@ src/
 │   ├── repositories/
 │   │   └── TransactionsViewRepository.kt               # Reactive repository
 │   └── services/                                       # Business logic services
-│       ├── CdcLockService.kt                          # Distributed locking
-│       ├── EcommerceCDCEventDispatcherService.kt     # Event processing
-│       ├── RedisResumePolicyService.kt               # Resume token management
-│       ├── ResumePolicyService.kt                    # Resume policy interface
-│       ├── TimestampRedisTemplate.kt                 # Redis timestamp operations
-│       └── TransactionViewUpsertService.kt           # Transaction view updates
+│       ├── CdcLockService.kt                           # Distributed locking
+│       ├── EcommerceCDCEventDispatcherService.kt       # Event processing
+│       ├── RedisResumePolicyService.kt                 # Resume token management
+│       ├── ResumePolicyService.kt                      # Resume policy interface
+│       ├── TimestampRedisTemplate.kt                   # Redis timestamp operations
+│       └── TransactionViewUpsertService.kt             # Transaction view updates
 ├── main/resources/
-│   └── application.properties                         # Configuration
-└── test/kotlin/it/pagopa/ecommerce/cdc/              # Test classes
+│   └── application.properties                          # Configuration
+└── test/kotlin/it/pagopa/ecommerce/cdc/                # Test classes
     ├── PagopaEcommerceCdcServiceApplicationTests.kt
     ├── datacapture/
     ├── services/
