@@ -182,8 +182,6 @@ src/
 │   │   ├── CdcEventProcessingLockNotAcquiredException.kt
 │   │   ├── CdcEventTypeException.kt
 │   │   └── CdcQueryMatchException.kt
-│   ├── repositories/
-│   │   └── TransactionsViewRepository.kt               # Reactive repository
 │   └── services/                                       # Business logic services
 │       ├── CdcLockService.kt                           # Distributed locking
 │       ├── EcommerceCDCEventDispatcherService.kt       # Event processing
