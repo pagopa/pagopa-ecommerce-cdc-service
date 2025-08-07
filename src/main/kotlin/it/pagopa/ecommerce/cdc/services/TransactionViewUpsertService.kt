@@ -281,12 +281,12 @@ class TransactionViewUpsertService(
         val update = buildCommonUpdate()
         val statusUpdate = buildCommonUpdate()
         val data = event.data
-        update["email"] = data.email.opaqueData
+        update["email"] = data.email
         update["paymentNotices"] = data.paymentNotices
         update["clientId"] = data.clientId
         update["creationDate"] = event.creationDate
 
-        statusUpdate["email"] = data.email.opaqueData
+        statusUpdate["email"] = data.email
         statusUpdate["paymentNotices"] = data.paymentNotices
         statusUpdate["clientId"] = data.clientId
         statusUpdate["creationDate"] = event.creationDate

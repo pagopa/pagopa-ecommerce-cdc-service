@@ -162,7 +162,7 @@ class TransactionViewUpsertServiceTest {
                             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                             setDocument["lastProcessedEventAt"],
                         )
-                        assertEquals(event.data.email.opaqueData, setDocument["email"])
+                        assertEquals(event.data.email, setDocument["email"])
                         assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
                         assertEquals(event.data.clientId, setDocument["clientId"])
                         assertEquals(event.creationDate, setDocument["creationDate"])
@@ -180,7 +180,7 @@ class TransactionViewUpsertServiceTest {
                     eq(queryByTransactionId),
                     argThat { update ->
                         val setDocument = update.updateObject[$$"$set"] as Document
-                        assertEquals(event.data.email.opaqueData, setDocument["email"])
+                        assertEquals(event.data.email, setDocument["email"])
                         assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
                         assertEquals(event.data.clientId, setDocument["clientId"])
                         assertEquals(event.creationDate, setDocument["creationDate"])
@@ -232,7 +232,7 @@ class TransactionViewUpsertServiceTest {
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
-                    assertEquals(event.data.email.opaqueData, setDocument["email"])
+                    assertEquals(event.data.email, setDocument["email"])
                     assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
                     assertEquals(event.data.clientId, setDocument["clientId"])
                     assertEquals(event.creationDate, setDocument["creationDate"])
