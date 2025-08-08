@@ -15,6 +15,7 @@ import kotlinx.coroutines.reactor.mono
 import org.bson.BsonString
 import org.bson.Document
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertNull
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
@@ -46,6 +47,25 @@ class TransactionViewUpsertServiceTest {
                 Arguments.of(
                     TransactionTestUtils.transactionAuthorizationCompletedEvent(
                         TransactionTestUtils.npgTransactionGatewayAuthorizationData(
+                            OperationResultDto.EXECUTED
+                        )
+                    ),
+                    OperationResultDto.EXECUTED.toString(),
+                    null,
+                ),
+                Arguments.of(
+                    TransactionTestUtils.transactionAuthorizationCompletedEvent(
+                        TransactionTestUtils.redirectTransactionGatewayAuthorizationData(
+                            RedirectTransactionGatewayAuthorizationData.Outcome.OK,
+                            null,
+                        )
+                    ),
+                    RedirectTransactionGatewayAuthorizationData.Outcome.OK.toString(),
+                    null,
+                ),
+                Arguments.of(
+                    TransactionTestUtils.transactionAuthorizationCompletedEvent(
+                        TransactionTestUtils.npgTransactionGatewayAuthorizationData(
                             OperationResultDto.FAILED,
                             "npg failed",
                         )
@@ -62,6 +82,27 @@ class TransactionViewUpsertServiceTest {
                     ),
                     RedirectTransactionGatewayAuthorizationData.Outcome.KO.toString(),
                     "redirect failed",
+                ),
+            )
+
+        @JvmStatic
+        fun `authCompleted events with null value for error code`(): Stream<Arguments> =
+            Stream.of(
+                Arguments.of(
+                    TransactionTestUtils.transactionAuthorizationCompletedEvent(
+                        TransactionTestUtils.npgTransactionGatewayAuthorizationData(
+                            OperationResultDto.FAILED,
+                            null,
+                        )
+                    )
+                ),
+                Arguments.of(
+                    TransactionTestUtils.transactionAuthorizationCompletedEvent(
+                        TransactionTestUtils.redirectTransactionGatewayAuthorizationData(
+                            RedirectTransactionGatewayAuthorizationData.Outcome.KO,
+                            null,
+                        )
+                    )
                 ),
             )
 
@@ -162,11 +203,10 @@ class TransactionViewUpsertServiceTest {
                             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                             setDocument["lastProcessedEventAt"],
                         )
-                        assertEquals(event.data.email.opaqueData, setDocument["email"])
+                        assertEquals(event.data.email, setDocument["email"])
                         assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
                         assertEquals(event.data.clientId, setDocument["clientId"])
                         assertEquals(event.creationDate, setDocument["creationDate"])
-                        assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                         true
                     },
                     eq(BaseTransactionView::class.java),
@@ -180,11 +220,10 @@ class TransactionViewUpsertServiceTest {
                     eq(queryByTransactionId),
                     argThat { update ->
                         val setDocument = update.updateObject[$$"$set"] as Document
-                        assertEquals(event.data.email.opaqueData, setDocument["email"])
+                        assertEquals(event.data.email, setDocument["email"])
                         assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
                         assertEquals(event.data.clientId, setDocument["clientId"])
                         assertEquals(event.creationDate, setDocument["creationDate"])
-                        assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                         true
                     },
                     eq(BaseTransactionView::class.java),
@@ -232,7 +271,7 @@ class TransactionViewUpsertServiceTest {
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
-                    assertEquals(event.data.email.opaqueData, setDocument["email"])
+                    assertEquals(event.data.email, setDocument["email"])
                     assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
                     assertEquals(event.data.clientId, setDocument["clientId"])
                     assertEquals(event.creationDate, setDocument["creationDate"])
@@ -351,7 +390,6 @@ class TransactionViewUpsertServiceTest {
                     assertEquals(event.data.paymentTypeCode, setDocument["paymentTypeCode"])
                     assertEquals(event.data.pspId, setDocument["pspId"])
                     assertEquals(event.data.fee, setDocument["feeTotal"])
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -496,7 +534,6 @@ class TransactionViewUpsertServiceTest {
                     assertEquals(event.data.paymentTypeCode, setDocument["paymentTypeCode"])
                     assertEquals(event.data.pspId, setDocument["pspId"])
                     assertEquals(event.data.fee, setDocument["feeTotal"])
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -520,7 +557,6 @@ class TransactionViewUpsertServiceTest {
                     assertEquals(event.data.paymentTypeCode, setDocument["paymentTypeCode"])
                     assertEquals(event.data.pspId, setDocument["pspId"])
                     assertEquals(event.data.fee, setDocument["feeTotal"])
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -537,7 +573,7 @@ class TransactionViewUpsertServiceTest {
     fun `should perform upsert operation gathering data from transaction authorization completed event when transaction view is already present with lastProcessedEventAt timestamp before event creationDate `(
         event: TransactionAuthorizationCompletedEvent,
         expectedAuthorizationStatus: String,
-        expectedAuthorizationErrorCode: String,
+        expectedAuthorizationErrorCode: String?,
     ) {
         // pre-conditions)
         val queryByTransactionId =
@@ -583,17 +619,167 @@ class TransactionViewUpsertServiceTest {
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),
                     )
-                    assertEquals(
-                        expectedAuthorizationErrorCode,
-                        setDocument["authorizationErrorCode"],
+                    if (expectedAuthorizationErrorCode != null) {
+                        assertEquals(
+                            expectedAuthorizationErrorCode,
+                            setDocument["authorizationErrorCode"],
+                        )
+                    } else {
+                        kotlin.test.assertNull(setDocument["authorizationErrorCode"])
+                    }
+
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+    }
+
+    @Test
+    fun `should perform upsert for authorization completed event with null values for authorizationCode and rrn `() {
+        // pre-conditions
+
+        val event =
+            TransactionTestUtils.transactionAuthorizationCompletedEvent(
+                TransactionTestUtils.npgTransactionGatewayAuthorizationData(
+                    OperationResultDto.EXECUTED
+                )
+            )
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
                     )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(1L, 1L, null))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(
+                        TransactionStatusDto.AUTHORIZATION_COMPLETED,
+                        setDocument["status"],
+                    )
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
+                    assertEquals(
+                        OperationResultDto.EXECUTED.toString(),
+                        setDocument["gatewayAuthorizationStatus"].toString(),
+                    )
+                    assertNull(setDocument["authorizationErrorCode"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
+
+        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+    }
+
+    @ParameterizedTest
+    @MethodSource("authCompleted events with null value for error code")
+    fun `should perform upsert operation with null values `(
+        event: TransactionAuthorizationCompletedEvent
+    ) {
+        // pre-conditions)
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(1L, 1L, null))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(
+                        TransactionStatusDto.AUTHORIZATION_COMPLETED,
+                        setDocument["status"],
+                    )
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertNull(setDocument["authorizationErrorCode"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -612,7 +798,7 @@ class TransactionViewUpsertServiceTest {
     fun `should perform upsert operation gathering data from transaction authorization completed event when transaction view is already present with lastProcessedEventAt timestamp after event creationDate `(
         event: TransactionAuthorizationCompletedEvent,
         expectedAuthorizationStatus: String,
-        expectedAuthorizationErrorCode: String,
+        expectedAuthorizationErrorCode: String?,
     ) {
         // pre-conditions)
         val queryByTransactionId =
@@ -662,17 +848,24 @@ class TransactionViewUpsertServiceTest {
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),
                     )
-                    assertEquals(
-                        expectedAuthorizationErrorCode,
-                        setDocument["authorizationErrorCode"],
-                    )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
+                    if (expectedAuthorizationErrorCode != null) {
+                        assertEquals(
+                            expectedAuthorizationErrorCode,
+                            setDocument["authorizationErrorCode"],
+                        )
+                    } else {
+                        kotlin.test.assertNull(setDocument["authorizationErrorCode"])
+                    }
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -684,17 +877,24 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionId),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),
                     )
-                    assertEquals(
-                        expectedAuthorizationErrorCode,
-                        setDocument["authorizationErrorCode"],
-                    )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
+                    if (expectedAuthorizationErrorCode != null) {
+                        assertEquals(
+                            expectedAuthorizationErrorCode,
+                            setDocument["authorizationErrorCode"],
+                        )
+                    } else {
+                        kotlin.test.assertNull(setDocument["authorizationErrorCode"])
+                    }
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -711,7 +911,7 @@ class TransactionViewUpsertServiceTest {
     fun `should perform upsert operation gathering data from transaction authorization completed event when transaction view is not present`(
         event: TransactionAuthorizationCompletedEvent,
         expectedAuthorizationStatus: String,
-        expectedAuthorizationErrorCode: String,
+        expectedAuthorizationErrorCode: String?,
     ) {
         // pre-conditions)
         val queryByTransactionId =
@@ -776,16 +976,24 @@ class TransactionViewUpsertServiceTest {
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),
                     )
-                    assertEquals(
-                        expectedAuthorizationErrorCode,
-                        setDocument["authorizationErrorCode"],
-                    )
+                    if (expectedAuthorizationErrorCode != null) {
+                        assertEquals(
+                            expectedAuthorizationErrorCode,
+                            setDocument["authorizationErrorCode"],
+                        )
+                    } else {
+                        kotlin.test.assertNull(setDocument["authorizationErrorCode"])
+                    }
                     assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
@@ -798,17 +1006,24 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionId),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),
                     )
-                    assertEquals(
-                        expectedAuthorizationErrorCode,
-                        setDocument["authorizationErrorCode"],
-                    )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
+                    if (expectedAuthorizationErrorCode != null) {
+                        assertEquals(
+                            expectedAuthorizationErrorCode,
+                            setDocument["authorizationErrorCode"],
+                        )
+                    } else {
+                        kotlin.test.assertNull(setDocument["authorizationErrorCode"])
+                    }
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -827,8 +1042,12 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),
@@ -896,7 +1115,6 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -963,7 +1181,6 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1043,7 +1260,6 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1244,7 +1460,6 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1321,7 +1536,6 @@ class TransactionViewUpsertServiceTest {
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
                     assertEquals(null, setDocument["closureErrorData"])
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1398,7 +1612,6 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1583,7 +1796,6 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1654,7 +1866,6 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1824,7 +2035,6 @@ class TransactionViewUpsertServiceTest {
                         TransactionUserReceiptData.Outcome.NOT_RECEIVED.toString(),
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -1899,7 +2109,6 @@ class TransactionViewUpsertServiceTest {
                         sendPaymentResultOutcome,
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -2004,7 +2213,6 @@ class TransactionViewUpsertServiceTest {
                         sendPaymentResultOutcome,
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -2096,7 +2304,6 @@ class TransactionViewUpsertServiceTest {
                         sendPaymentResultOutcome,
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -2117,7 +2324,6 @@ class TransactionViewUpsertServiceTest {
                         sendPaymentResultOutcome,
                         setDocument["sendPaymentResultOutcome"].toString(),
                     )
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
                     true
                 },
                 eq(BaseTransactionView::class.java),
