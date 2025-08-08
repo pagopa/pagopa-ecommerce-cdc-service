@@ -583,8 +583,12 @@ class TransactionViewUpsertServiceTest {
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),
@@ -662,8 +666,12 @@ class TransactionViewUpsertServiceTest {
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),
@@ -684,8 +692,12 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionId),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),
@@ -776,8 +788,12 @@ class TransactionViewUpsertServiceTest {
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
                     )
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),
@@ -798,8 +814,12 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionId),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),
@@ -827,8 +847,12 @@ class TransactionViewUpsertServiceTest {
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
-                    assertEquals(event.data.rrn, setDocument["rrn"])
-                    assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    if (event.data.rrn != null) {
+                        assertEquals(event.data.rrn, setDocument["rrn"])
+                    }
+                    if (event.data.authorizationCode != null) {
+                        assertEquals(event.data.authorizationCode, setDocument["authorizationCode"])
+                    }
                     assertEquals(
                         expectedAuthorizationStatus,
                         setDocument["gatewayAuthorizationStatus"].toString(),

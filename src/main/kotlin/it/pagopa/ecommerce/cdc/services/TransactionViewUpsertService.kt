@@ -334,11 +334,15 @@ class TransactionViewUpsertService(
         val statusUpdate = buildCommonUpdate()
         val data = event.data
 
-        update["authorizationCode"] = data.authorizationCode
-
-        statusUpdate["authorizationCode"] = data.authorizationCode
-
         val gatewayAuthData = data.transactionGatewayAuthorizationData
+
+        if (data.authorizationCode != null) {
+            update["authorizationCode"] = data.authorizationCode
+            statusUpdate["authorizationCode"] = data.authorizationCode
+        } else {
+            update.unset("authorizationCode")
+            statusUpdate.unset("authorizationCode")
+        }
 
         if (data.rrn != null) {
             update["rrn"] = data.rrn
