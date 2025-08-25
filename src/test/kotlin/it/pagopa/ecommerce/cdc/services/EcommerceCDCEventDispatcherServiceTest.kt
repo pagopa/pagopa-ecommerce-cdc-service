@@ -1,5 +1,6 @@
 package it.pagopa.ecommerce.cdc.services
 
+import com.mongodb.client.result.UpdateResult
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
 import kotlinx.coroutines.reactor.mono
@@ -21,7 +22,9 @@ class EcommerceCDCEventDispatcherServiceTest {
     fun `should successfully dispatch and process transaction event`() {
         val event = EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent()
 
-        given(transactionViewUpsertService.upsertEventData(any())).willReturn { mono {} }
+        given(transactionViewUpsertService.upsertEventData(any())).willReturn {
+            mono { UpdateResult.acknowledged(0L, 0L, null) }
+        }
         val result = ecommerceCDCEventDispatcherService.dispatchEvent(event)
 
         StepVerifier.create(result).expectNext(event).verifyComplete()
