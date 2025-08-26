@@ -250,8 +250,6 @@ class TransactionViewUpsertServiceTest {
             .verifyComplete()
 
         // verifications
-        verify(mongoTemplate, times(1)).exists(any(), any(), anyString())
-
         verify(mongoTemplate, times(1))
             .updateFirst(
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
@@ -447,9 +445,6 @@ class TransactionViewUpsertServiceTest {
                 mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
             }
 
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any()))
-            .willReturn(Mono.just(false))
-
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
             .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
@@ -481,8 +476,6 @@ class TransactionViewUpsertServiceTest {
             )
 
         verify(mongoTemplate, times(1)).updateFirst(eq(queryByTransactionId), any(), any(), any())
-
-        verify(mongoTemplate, times(1)).exists(eq(queryByTransactionId), any(), any())
 
         verify(mongoTemplate, times(1)).upsert(any(), any(), any(), any())
     }
@@ -645,8 +638,6 @@ class TransactionViewUpsertServiceTest {
             )
 
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
-
-        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
 
         verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
     }
@@ -954,9 +945,6 @@ class TransactionViewUpsertServiceTest {
                 mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
             }
 
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any()))
-            .willReturn(Mono.just(false))
-
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
             .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
@@ -1026,13 +1014,6 @@ class TransactionViewUpsertServiceTest {
                     }
                     true
                 },
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
-            )
-
-        verify(mongoTemplate, times(1))
-            .exists(
-                eq(queryByTransactionId),
                 eq(BaseTransactionView::class.java),
                 eq(collectionName),
             )
@@ -1223,10 +1204,6 @@ class TransactionViewUpsertServiceTest {
             )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
-            mono { false }
-        }
-
         given(
                 mongoTemplate.upsert(
                     eq(queryByTransactionAndLastProcessedEventAtCondition),
@@ -1267,13 +1244,6 @@ class TransactionViewUpsertServiceTest {
             )
 
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
-
-        verify(mongoTemplate, times(1))
-            .exists(
-                eq(queryByTransactionId),
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
-            )
 
         verify(mongoTemplate, times(1))
             .upsert(
@@ -1330,10 +1300,6 @@ class TransactionViewUpsertServiceTest {
             )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
-            mono { false }
-        }
-
         given(
                 mongoTemplate.upsert(
                     eq(queryByTransactionAndLastProcessedEventAtCondition),
@@ -1375,13 +1341,6 @@ class TransactionViewUpsertServiceTest {
             )
 
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
-
-        verify(mongoTemplate, times(1))
-            .exists(
-                eq(queryByTransactionId),
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
-            )
 
         verify(mongoTemplate, times(1))
             .upsert(
@@ -1435,9 +1394,15 @@ class TransactionViewUpsertServiceTest {
             )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
-            mono { true }
-        }
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willReturn(Mono.error { Exception("Test exception") })
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1469,13 +1434,6 @@ class TransactionViewUpsertServiceTest {
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
         verify(mongoTemplate, times(1))
-            .exists(
-                eq(queryByTransactionId),
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
-            )
-
-        verify(mongoTemplate, times(0))
             .upsert(eq(queryByTransactionAndLastProcessedEventAtCondition), any(), any(), any())
     }
 
@@ -1511,9 +1469,15 @@ class TransactionViewUpsertServiceTest {
             )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
-            mono { true }
-        }
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willReturn(Mono.error { Exception("Test exception") })
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1545,13 +1509,6 @@ class TransactionViewUpsertServiceTest {
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
         verify(mongoTemplate, times(1))
-            .exists(
-                eq(queryByTransactionId),
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
-            )
-
-        verify(mongoTemplate, times(0))
             .upsert(eq(queryByTransactionAndLastProcessedEventAtCondition), any(), any(), any())
     }
 
@@ -1660,10 +1617,6 @@ class TransactionViewUpsertServiceTest {
             )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
-            mono { false }
-        }
-
         given(
                 mongoTemplate.upsert(
                     eq(queryByTransactionAndLastProcessedEventAtCondition),
@@ -1705,13 +1658,6 @@ class TransactionViewUpsertServiceTest {
             )
 
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
-
-        verify(mongoTemplate, times(1))
-            .exists(
-                eq(queryByTransactionId),
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
-            )
 
         verify(mongoTemplate, times(1))
             .upsert(
@@ -1771,9 +1717,15 @@ class TransactionViewUpsertServiceTest {
             )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
-            mono { true }
-        }
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willReturn(Mono.error { Exception("Test exception") })
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1805,13 +1757,7 @@ class TransactionViewUpsertServiceTest {
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
         verify(mongoTemplate, times(1))
-            .exists(
-                eq(queryByTransactionId),
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
-            )
-
-        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+            .upsert(eq(queryByTransactionAndLastProcessedEventAtCondition), any(), any(), any())
     }
 
     // Closure retried
@@ -1874,8 +1820,6 @@ class TransactionViewUpsertServiceTest {
 
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
-        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
-
         verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
     }
 
@@ -1914,10 +1858,6 @@ class TransactionViewUpsertServiceTest {
             )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
-            mono { false }
-        }
-
         given(
                 mongoTemplate.upsert(
                     eq(queryByTransactionAndLastProcessedEventAtCondition),
@@ -1954,13 +1894,6 @@ class TransactionViewUpsertServiceTest {
             )
 
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
-
-        verify(mongoTemplate, times(1))
-            .exists(
-                eq(queryByTransactionId),
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
-            )
 
         verify(mongoTemplate, times(1))
             .upsert(
@@ -2015,9 +1948,15 @@ class TransactionViewUpsertServiceTest {
             )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
-            mono { true }
-        }
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willReturn(Mono.error(Exception("test exception")))
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -2044,13 +1983,7 @@ class TransactionViewUpsertServiceTest {
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
         verify(mongoTemplate, times(1))
-            .exists(
-                eq(queryByTransactionId),
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
-            )
-
-        verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
+            .upsert(eq(queryByTransactionAndLastProcessedEventAtCondition), any(), any(), any())
     }
 
     @ParameterizedTest
@@ -2117,8 +2050,6 @@ class TransactionViewUpsertServiceTest {
 
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
-        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
-
         verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
     }
 
@@ -2174,9 +2105,6 @@ class TransactionViewUpsertServiceTest {
                 mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
             }
 
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any()))
-            .willReturn(Mono.just(false))
-
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
             .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
@@ -2215,13 +2143,6 @@ class TransactionViewUpsertServiceTest {
                     )
                     true
                 },
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
-            )
-
-        verify(mongoTemplate, times(1))
-            .exists(
-                eq(queryByTransactionId),
                 eq(BaseTransactionView::class.java),
                 eq(collectionName),
             )
@@ -2329,7 +2250,6 @@ class TransactionViewUpsertServiceTest {
                 eq(BaseTransactionView::class.java),
                 eq(collectionName),
             )
-        verify(mongoTemplate, times(0)).exists(eq(queryByTransactionId), any(), any())
 
         verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
     }
@@ -2365,10 +2285,6 @@ class TransactionViewUpsertServiceTest {
                 )
             )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
-
-        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any())).willAnswer {
-            mono { false }
-        }
 
         given(
                 mongoTemplate.upsert(
@@ -2410,12 +2326,7 @@ class TransactionViewUpsertServiceTest {
                 any(),
             )
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
-        verify(mongoTemplate, times(1))
-            .exists(
-                eq(queryByTransactionId),
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
-            )
+
         verify(mongoTemplate, times(1))
             .upsert(
                 eq(queryByTransactionAndLastProcessedEventAtCondition),

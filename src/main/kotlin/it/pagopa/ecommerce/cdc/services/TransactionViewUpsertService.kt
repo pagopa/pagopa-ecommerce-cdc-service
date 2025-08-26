@@ -52,20 +52,12 @@ class TransactionViewUpsertService(
             .flatMap { (update, updateStatus) ->
                 tryToUpdateExistingView(event, updateStatus, update).flatMap { updateResult ->
                     if (updateResult.modifiedCount == 0L) {
-                        isTransactionPresent(event).flatMap {
-                            if (!it) {
-                                upsertTransaction(
-                                        event,
-                                        updateStatus.set(
-                                            "_class",
-                                            Transaction::class.java.canonicalName,
-                                        ),
-                                    )
-                                    .filter { result -> result.upsertedId != null }
-                            } else {
-                                Mono.empty()
-                            }
-                        }
+                        upsertTransaction(
+                                event,
+                                updateStatus.set("_class", Transaction::class.java.canonicalName),
+                            )
+                            .onErrorResume { Mono.empty() }
+                            .filter { result -> result.upsertedId != null }
                     } else {
                         Mono.just(updateResult)
                     }
