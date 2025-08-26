@@ -118,19 +118,8 @@ class TransactionViewUpsertService(
         event: TransactionEvent<*>,
         statusUpdate: Update,
     ): Mono<UpdateResult> {
-        val queryWithTimestamp =
-            Query.query(
-                Criteria.where("transactionId")
-                    .`is`(event.transactionId)
-                    .orOperator(
-                        Criteria.where("lastProcessedEventAt").exists(false),
-                        Criteria.where("lastProcessedEventAt")
-                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
-                    )
-            )
-
         return mongoTemplate.updateFirst(
-            queryWithTimestamp,
+            buildQuery(event, true),
             statusUpdate,
             BaseTransactionView::class.java,
             transactionViewName,
@@ -164,10 +153,8 @@ class TransactionViewUpsertService(
         event: TransactionEvent<*>,
         dataUpdate: Update,
     ): Mono<UpdateResult> {
-        val queryByTransactionId =
-            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
         return mongoTemplate.updateFirst(
-            queryByTransactionId,
+            buildQuery(event, false),
             dataUpdate,
             BaseTransactionView::class.java,
             transactionViewName,
