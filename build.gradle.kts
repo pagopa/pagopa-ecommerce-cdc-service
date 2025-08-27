@@ -43,7 +43,7 @@ object Dependencies {
 val ecommerceCommonsVersion = "3.0.2"
 
 // eCommerce commons library git ref (by default tag)
-val ecommerceCommonsGitRef = "CHK-4371-add-wasCanceledByUserInfo"
+val ecommerceCommonsGitRef = ecommerceCommonsVersion
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-data-mongodb-reactive")
