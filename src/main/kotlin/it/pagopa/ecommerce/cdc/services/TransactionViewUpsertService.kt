@@ -52,20 +52,12 @@ class TransactionViewUpsertService(
             .flatMap { (update, updateStatus) ->
                 tryToUpdateExistingView(event, updateStatus, update).flatMap { updateResult ->
                     if (updateResult.modifiedCount == 0L) {
-                        isTransactionPresent(event).flatMap {
-                            if (!it) {
-                                upsertTransaction(
-                                        event,
-                                        updateStatus.set(
-                                            "_class",
-                                            Transaction::class.java.canonicalName,
-                                        ),
-                                    )
-                                    .filter { result -> result.upsertedId != null }
-                            } else {
-                                Mono.empty()
-                            }
-                        }
+                        upsertTransaction(
+                                event,
+                                updateStatus.set("_class", Transaction::class.java.canonicalName),
+                            )
+                            .onErrorResume { Mono.empty() }
+                            .filter { result -> result.upsertedId != null }
                     } else {
                         Mono.just(updateResult)
                     }
@@ -114,44 +106,21 @@ class TransactionViewUpsertService(
     }
 
     /**
-     * Checks if a given transaction is already present in the db
-     *
-     * @param event The MongoDB change stream event document
-     * @return Boolean true iff the transaction exists
-     */
-    private fun isTransactionPresent(event: TransactionEvent<*>) =
-        mongoTemplate.exists(
-            buildQuery(event),
-            BaseTransactionView::class.java,
-            transactionViewName,
-        )
-
-    /**
      * Updates transaction status only if the event is newer than the last processed event. This
      * prevents out-of-order events from overwriting current transaction state.
      *
      * @param event The MongoDB change stream event document
-     * @param updateStatus the update data to save on the db
+     * @param statusUpdate the update status and data to save on the db, if the lastProcessedEventAt
+     *   in the view is before the creation date
      * @return Mono<UpdateResult> the update operation status
      */
     private fun updateStatusIfEventIsNewer(
         event: TransactionEvent<*>,
-        updateStatus: Update,
+        statusUpdate: Update,
     ): Mono<UpdateResult> {
-        val queryWithTimestamp =
-            Query.query(
-                Criteria.where("transactionId")
-                    .`is`(event.transactionId)
-                    .orOperator(
-                        Criteria.where("lastProcessedEventAt").exists(false),
-                        Criteria.where("lastProcessedEventAt")
-                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
-                    )
-            )
-
         return mongoTemplate.updateFirst(
-            queryWithTimestamp,
-            updateStatus,
+            buildQuery(event, true),
+            statusUpdate,
             BaseTransactionView::class.java,
             transactionViewName,
         )
@@ -159,13 +128,14 @@ class TransactionViewUpsertService(
 
     /**
      * @param event The MongoDB change stream event document
-     * @param updateStatus the update data to save on the db
+     * @param statusUpdate the update status and data to save on the db, if the lastProcessedEventAt
+     *   in the view is before the creation date
      * @return Mono<UpdateResult> the update operation status
      */
-    private fun upsertTransaction(event: TransactionEvent<*>, updateStatus: Update) =
+    private fun upsertTransaction(event: TransactionEvent<*>, statusUpdate: Update) =
         mongoTemplate.upsert(
             buildQuery(event, true),
-            updateStatus,
+            statusUpdate,
             BaseTransactionView::class.java,
             transactionViewName,
         )
@@ -175,18 +145,17 @@ class TransactionViewUpsertService(
      * as it doesn't affect transaction state.
      *
      * @param event The MongoDB change stream event document
-     * @param status the update data to save on the db
+     * @param dataUpdate the update data to save on the db, regardless the lastProcessedEventAt in
+     *   the view
      * @return Mono<UpdateResult> the update operation status
      */
     private fun updateDataWithoutConstraints(
         event: TransactionEvent<*>,
-        status: Update,
+        dataUpdate: Update,
     ): Mono<UpdateResult> {
-        val queryByTransactionId =
-            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
         return mongoTemplate.updateFirst(
-            queryByTransactionId,
-            status,
+            buildQuery(event, false),
+            dataUpdate,
             BaseTransactionView::class.java,
             transactionViewName,
         )
@@ -196,24 +165,27 @@ class TransactionViewUpsertService(
      * Method to try to update an existing view
      *
      * @param event The MongoDB change stream event document
-     * @param updateStatus the update data to save on the db
+     * @param statusUpdate the update status and data to save on the db, if the lastProcessedEventAt
+     *   in the view is before the creation date
+     * @param dataUpdate the update data to save on the db, regardless the lastProcessedEventAt in
+     *   the view
      * @return Mono<UpdateResult> the update operation status
      */
     private fun tryToUpdateExistingView(
         event: TransactionEvent<*>,
-        updateStatus: Update,
-        update: Update?,
+        statusUpdate: Update,
+        dataUpdate: Update?,
     ): Mono<UpdateResult> {
-        return when (update) {
-            null -> updateStatusIfEventIsNewer(event, updateStatus)
+        return when (dataUpdate) {
+            null -> updateStatusIfEventIsNewer(event, statusUpdate)
             // if only the status should be updated and it is going to fail because
             // the lastProcessedEventAt is after the event creation date the filter
             // should exclude all the existing document from the subsequent upsert.
             // So the filter should return false if the document doesn't exist.
             else ->
-                updateStatusIfEventIsNewer(event, updateStatus).flatMap {
+                updateStatusIfEventIsNewer(event, statusUpdate).flatMap {
                     if (it.modifiedCount == 0L) {
-                        updateDataWithoutConstraints(event, update)
+                        updateDataWithoutConstraints(event, dataUpdate)
                     } else {
                         Mono.just(it)
                     }
