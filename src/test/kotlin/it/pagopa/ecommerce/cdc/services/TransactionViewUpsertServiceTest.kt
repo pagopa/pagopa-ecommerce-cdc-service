@@ -444,7 +444,6 @@ class TransactionViewUpsertServiceTest {
             .willAnswer {
                 mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
             }
-
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
             .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
@@ -476,7 +475,6 @@ class TransactionViewUpsertServiceTest {
             )
 
         verify(mongoTemplate, times(1)).updateFirst(eq(queryByTransactionId), any(), any(), any())
-
         verify(mongoTemplate, times(1)).upsert(any(), any(), any(), any())
     }
 
@@ -598,7 +596,6 @@ class TransactionViewUpsertServiceTest {
             .expectNext(UpdateResult.acknowledged(1L, 1L, null))
             .verifyComplete()
 
-        // verifications
         verify(mongoTemplate, times(1))
             .updateFirst(
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
@@ -630,7 +627,6 @@ class TransactionViewUpsertServiceTest {
                     } else {
                         kotlin.test.assertNull(setDocument["authorizationErrorCode"])
                     }
-
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -2326,7 +2322,6 @@ class TransactionViewUpsertServiceTest {
                 any(),
             )
         verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
-
         verify(mongoTemplate, times(1))
             .upsert(
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
