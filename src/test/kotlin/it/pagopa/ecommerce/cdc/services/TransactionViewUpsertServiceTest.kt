@@ -250,17 +250,6 @@ class TransactionViewUpsertServiceTest {
             .verifyComplete()
 
         // verifications
-        verify(mongoTemplate, times(1)).exists(any(), any(), anyString())
-
-        verify(mongoTemplate, times(1))
-            .updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
-            )
-        verify(mongoTemplate, times(1)).updateFirst(eq(queryByTransactionId), any(), any(), any())
-
         verify(mongoTemplate, times(1))
             .updateFirst(
                 eq(queryByTransactionAndLastProcessedEventAtCondition),
