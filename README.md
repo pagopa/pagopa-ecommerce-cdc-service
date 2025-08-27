@@ -17,8 +17,42 @@ these updates are appropriately handled in a (near) real-time manner.
 
 ## Technology Stack
 
-- Kotlin
-- Spring Boot
+- **Language**: Kotlin with Java 21
+- **Framework**: Spring Boot 3.5.3 with Spring WebFlux (reactive)
+- **Database**: MongoDB Reactive with Change Data Capture
+- **Cache/Locking**: Redis with Redisson for distributed locking
+- **Build Tool**: Gradle with Kotlin DSL
+- **Testing**: JUnit 5
+- **Code Quality**: Spotless (formatting), SonarQube, JaCoCo (coverage)
+- **Integration**: eCommerce commons library for transaction models
+
+## Architecture Overview
+
+The PagoPA eCommerce CDC Service implements a MongoDB Change Data Capture pattern to maintain materialized transaction views in real-time. The service architecture consists of several key components:
+
+### Core Components
+
+- **EcommerceTransactionsLogEventsStream**: Main CDC consumer that listens to MongoDB Change Streams for transaction events
+- **EcommerceCDCEventDispatcherService**: Orchestrates event processing with retry logic and error handling
+- **TransactionViewUpsertService**: Performs atomic upsert operations on transaction views with conditional logic
+- **CdcLockService**: Manages distributed locking via Redis to prevent concurrent event processing
+- **RedisResumePolicyService**: Handles resume tokens for fault-tolerant change stream processing
+
+### Data Flow
+
+1. **Event Detection**: MongoDB Change Streams detect transaction events in the `eventstore` collection
+2. **Lock Acquisition**: Distributed locks ensure each event is processed by only one service instance
+3. **Event Processing**: Events are dispatched and processed based on event type and chronological order
+4. **View Updates**: Transaction views are updated using conditional logic based on event timestamps
+5. **Resume Token Persistence**: Resume tokens are saved to Redis for fault-tolerant recovery
+
+### Transaction View Logic
+
+The service implements sophisticated conditional update logic:
+- **Event Data Updates**: Always applied regardless of timestamp if the event being processed contains more info (enrichment data)
+- **Status Updates**: Only applied if the event is newer than `lastProcessedEventAt` (prevents out-of-order overwrites)
+- **Atomic Operations**: MongoDB upsert operations ensure data consistency
+- **Error Handling**: Comprehensive retry mechanisms and exception handling
 
 ---
 
@@ -124,6 +158,45 @@ Once the container is running, you can test the CDC functionality:
    docker logs -f <container_id>
    ```
    Look for log lines showing CDC events being processed as transactions flow through the system.
+
+## Project Structure
+
+The service follows a clean architecture with clear separation of concerns:
+
+```
+src/
+├── main/kotlin/it/pagopa/ecommerce/cdc/
+│   ├── PagopaEcommerceCdcServiceApplication.kt         # Main application
+│   ├── config/
+│   │   ├── RedisConfig.kt                              # Redis configuration
+│   │   └── properties/                                 # Configuration properties
+│   │       ├── ChangeStreamOptionsConfig.kt
+│   │       ├── RedisJobLockPolicyConfig.kt
+│   │       ├── RedisResumePolicyConfig.kt
+│   │       ├── RetrySendPolicyConfig.kt
+│   │       └── RetryStreamPolicyConfig.kt
+│   ├── datacapture/
+│   │   └── EcommerceTransactionsLogEventsStream.kt     # Main CDC stream consumer
+│   ├── exceptions/                                     # Custom exceptions
+│   │   ├── CdcEventProcessingLockException.kt
+│   │   ├── CdcEventProcessingLockNotAcquiredException.kt
+│   │   ├── CdcEventTypeException.kt
+│   │   └── CdcQueryMatchException.kt
+│   └── services/                                       # Business logic services
+│       ├── CdcLockService.kt                           # Distributed locking
+│       ├── EcommerceCDCEventDispatcherService.kt       # Event processing
+│       ├── RedisResumePolicyService.kt                 # Resume token management
+│       ├── ResumePolicyService.kt                      # Resume policy interface
+│       ├── TimestampRedisTemplate.kt                   # Redis timestamp operations
+│       └── TransactionViewUpsertService.kt             # Transaction view updates
+├── main/resources/
+│   └── application.properties                          # Configuration
+└── test/kotlin/it/pagopa/ecommerce/cdc/                # Test classes
+    ├── PagopaEcommerceCdcServiceApplicationTests.kt
+    ├── datacapture/
+    ├── services/
+    └── utils/
+```
 
 ### Integration Testing with pagopa-ecommerce-local
 
