@@ -228,7 +228,7 @@ eCommerce services.
 
 ### eCommerce Commons Library
 
-The service uses the `ecommerce-commons` library which is now distributed via GitHub Packages. The library version is configured in `build.gradle.kts`:
+The service uses the `ecommerce-commons` library which is now distributed via GitHub Packages. The library version is configured in `build.gradle.kts`.
 
 This two properties maps `ecommerce-commons` version and git ref:
 
@@ -242,10 +242,6 @@ with `"x.y.z"` will be checked out and installed locally.
 
 This value was left as a separate property because, during developing phases can be changed to a feature branch
 making the local build use a ref branch other than a tag for developing purpose.
-
-```kotlin
-val ecommerceCommonsVersion = "3.0.2"
-```
 
 The library is automatically downloaded from GitHub Packages during the build process using the configured GitHub token.
 
