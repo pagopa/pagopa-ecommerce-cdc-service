@@ -1,7 +1,7 @@
 microservice-chart:
   namespace: "ecommerce"
-  nameOverride: ""
-  fullnameOverride: "pagopa-ecommerce-cdc-service"
+  nameOverride: "b-pagopa-ecommerce-cdc-service"
+  fullnameOverride: "b-pagopaecommercecdcservice"
   canaryDelivery:
     create: false
     ingress:
