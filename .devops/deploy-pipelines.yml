@@ -73,7 +73,7 @@ stages:
     condition:
       and(
       succeeded(),
-      eq(${{parameters.UAT_PROD_DEPLOY}}, true),
+      eq(${{parameters.UAT_PROD_DEPLOY}}, true)
       )
     jobs:
       - job: "build"
