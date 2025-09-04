@@ -40,7 +40,7 @@ object Dependencies {
 }
 
 // eCommerce commons library version
-val ecommerceCommonsVersion = "3.0.2"
+val ecommerceCommonsVersion = "3.1.0"
 
 // eCommerce commons library git ref (by default tag)
 val ecommerceCommonsGitRef = ecommerceCommonsVersion
