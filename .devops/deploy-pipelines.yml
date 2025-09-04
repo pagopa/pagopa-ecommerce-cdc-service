@@ -47,11 +47,6 @@ parameters:
     type: string
     default: "."
 
-  - name: "DOCKER_BUILD_ARGS"
-    displayName: "Docker build arguments"
-    type: string
-    default: "--secret id=GITHUB_TOKEN,env=GITHUB_TOKEN"
-
   - name: "UAT_SKIP_BLUE_DEPLOYMENT"
     displayName: "Skip blue/green UAT deployment strategy: activating this parameter no blue version will be created and the pipeline proceed building and deploy artifact green version"
     type: boolean
@@ -107,11 +102,11 @@ stages:
                 echo "[INFO] Image version: $(Build.SourceVersion)"
                 docker build -t $(DEV_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(Build.SourceVersion) \
                   -f ${{ parameters.DOCKERFILE }} \
-                  ${{ parameters.DOCKER_BUILD_ARGS }} \
+                  --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN \
                   ${{ parameters.DOCKERCONTEXT }}
                 docker build -t $(DEV_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):latest \
                   -f ${{ parameters.DOCKERFILE }} \
-                  ${{ parameters.DOCKER_BUILD_ARGS }} \
+                  --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN \
                   ${{ parameters.DOCKERCONTEXT }}
                 docker push $(DEV_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(Build.SourceVersion)
                 docker push $(DEV_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):latest
@@ -133,11 +128,11 @@ stages:
                   echo "[INFO] docker image does not exist in the registry, start build and push"
                   docker build -t $(DEV_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(Build.SourceVersion) \
                     -f ${{ parameters.DOCKERFILE }} \
-                    ${{ parameters.DOCKER_BUILD_ARGS }} \
+                    --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN \
                     ${{ parameters.DOCKERCONTEXT }}
                   docker build -t $(DEV_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):latest \
                     -f ${{ parameters.DOCKERFILE }} \
-                    ${{ parameters.DOCKER_BUILD_ARGS }} \
+                    --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN \
                     ${{ parameters.DOCKERCONTEXT }}
                   docker push $(DEV_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(Build.SourceVersion)
                   docker push $(DEV_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):latest
@@ -210,11 +205,11 @@ stages:
                 echo "[INFO] Image version: $(Build.SourceVersion)"
                 docker build -t $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(Build.SourceVersion) \
                   -f ${{ parameters.DOCKERFILE }} \
-                  ${{ parameters.DOCKER_BUILD_ARGS }} \
+                  --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN \
                   ${{ parameters.DOCKERCONTEXT }}
                 docker build -t $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):latest \
                   -f ${{ parameters.DOCKERFILE }} \
-                  ${{ parameters.DOCKER_BUILD_ARGS }} \
+                  --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN \
                   ${{ parameters.DOCKERCONTEXT }}
                 docker push $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(Build.SourceVersion)
                 docker push $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):latest
@@ -236,11 +231,11 @@ stages:
                   echo "[INFO] docker image does not exist in the registry, start build and push"
                   docker build -t $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(Build.SourceVersion) \
                     -f ${{ parameters.DOCKERFILE }} \
-                    ${{ parameters.DOCKER_BUILD_ARGS }} \
+                    --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN \
                     ${{ parameters.DOCKERCONTEXT }}
                   docker build -t $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):latest \
                     -f ${{ parameters.DOCKERFILE }} \
-                    ${{ parameters.DOCKER_BUILD_ARGS }} \
+                    --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN \
                     ${{ parameters.DOCKERCONTEXT }}
                   docker push $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(Build.SourceVersion)
                   docker push $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):latest
