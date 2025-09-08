@@ -59,7 +59,7 @@ class EcommerceTransactionsLogEventsStreamTest {
     fun `should successfully process change stream events`() {
         val event = createSampleEventStoreEvent()
         val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
@@ -86,7 +86,7 @@ class EcommerceTransactionsLogEventsStreamTest {
         val mongoException = MongoException("Connection failed")
         val event = createSampleEventStoreEvent()
         val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -126,7 +126,7 @@ class EcommerceTransactionsLogEventsStreamTest {
     fun `should handle null documents gracefully`() {
         val changeStreamEvent =
             createMockChangeStreamEventWithNullDocument(operationType = "insert")
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -148,7 +148,7 @@ class EcommerceTransactionsLogEventsStreamTest {
     fun `should handle event dispatcher errors gracefully`() {
         val event = createSampleEventStoreEvent()
         val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -181,7 +181,7 @@ class EcommerceTransactionsLogEventsStreamTest {
             createMockChangeStreamEvent(operationType = "insert", event = event1)
         val changeStreamEvent2 =
             createMockChangeStreamEvent(operationType = "update", event = event2)
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -213,7 +213,7 @@ class EcommerceTransactionsLogEventsStreamTest {
     @Test
     fun `should exhaust retry attempts for persistent MongoDB errors`() {
         val mongoException = MongoException("Persistent connection error")
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -241,7 +241,7 @@ class EcommerceTransactionsLogEventsStreamTest {
     @Test
     fun `should not retry for non-MongoDB exceptions`() {
         val runtimeException = RuntimeException("Non-MongoDB error")
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -273,7 +273,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 operationType = "insert",
                 event = createSampleEventStoreEvent(),
             )
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -301,7 +301,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 operationType = "insert",
                 event = createSampleEventStoreEvent(),
             )
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
 
         given(
                 reactiveMongoTemplate.changeStream(
@@ -340,7 +340,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 createMockChangeStreamEvent(operationType = "insert", event = event)
             }
 
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
@@ -356,7 +356,7 @@ class EcommerceTransactionsLogEventsStreamTest {
             Mono.just(it.arguments[0])
         }
 
-        doNothing().`when`(redisResumePolicyService).saveResumeTimestamp(any())
+        given(redisResumePolicyService.saveResumeTimestamp(any())).willReturn(Mono.just(true))
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
@@ -396,7 +396,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 createMockChangeStreamEvent(operationType = "insert", event = event)
             }
 
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
@@ -442,7 +442,7 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
 
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
@@ -456,7 +456,7 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         given(ecommerceCDCEventDispatcherService.dispatchEvent(any())).willReturn(Mono.just(event))
 
-        doNothing().`when`(redisResumePolicyService).saveResumeTimestamp(any())
+        given(redisResumePolicyService.saveResumeTimestamp(any())).willReturn(Mono.just(true))
 
         val result = customStream.streamEcommerceTransactionsLogEvents()
 
@@ -493,7 +493,7 @@ class EcommerceTransactionsLogEventsStreamTest {
                 createMockChangeStreamEvent(operationType = "insert", event = event)
             }
 
-        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Instant.now())
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),

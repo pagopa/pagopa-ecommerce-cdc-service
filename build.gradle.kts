@@ -1,4 +1,3 @@
-import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 group = "it.pagopa.ecommerce.cdc"
@@ -40,7 +39,7 @@ object Dependencies {
 }
 
 // eCommerce commons library version
-val ecommerceCommonsVersion = "3.0.2"
+val ecommerceCommonsVersion = "3.2.0"
 
 // eCommerce commons library git ref (by default tag)
 val ecommerceCommonsGitRef = ecommerceCommonsVersion

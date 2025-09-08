@@ -69,33 +69,35 @@ class EcommerceTransactionsLogEventsStream(
                     logger.info(
                         "Connecting to MongoDB Change Stream for collection: ${changeStreamOptionsConfig.collection}"
                     )
-                    reactiveMongoTemplate
-                        .changeStream(
-                            changeStreamOptionsConfig.collection,
-                            ChangeStreamOptions.builder()
-                                .filter(
-                                    Aggregation.newAggregation(
-                                        Aggregation.match(
-                                            Criteria.where("operationType")
-                                                .`in`(changeStreamOptionsConfig.operationType)
-                                        ),
-                                        Aggregation.project(changeStreamOptionsConfig.project),
+                    redisResumePolicyService.getResumeTimestamp().flatMapMany { resumeTimestamp ->
+                        reactiveMongoTemplate
+                            .changeStream(
+                                changeStreamOptionsConfig.collection,
+                                ChangeStreamOptions.builder()
+                                    .filter(
+                                        Aggregation.newAggregation(
+                                            Aggregation.match(
+                                                Criteria.where("operationType")
+                                                    .`in`(changeStreamOptionsConfig.operationType)
+                                            ),
+                                            Aggregation.project(changeStreamOptionsConfig.project),
+                                        )
                                     )
-                                )
-                                .resumeAt(redisResumePolicyService.getResumeTimestamp())
-                                .build(),
-                            TransactionEvent::class.java,
-                        )
-                        // Process the elements of the Flux
-                        .flatMap { processEvent(it.body) }
-                        // Save resume token every n emitted elements
-                        .index { changeEventFluxIndex, changeEventDocument ->
-                            Pair(changeEventFluxIndex, changeEventDocument)
-                        }
-                        .flatMap { (changeEventFluxIndex, changeEventDocument) ->
-                            saveCdcResumeToken(changeEventFluxIndex, changeEventDocument)
-                        }
-                        .doOnError { logger.error("Error listening to change stream: ", it) }
+                                    .resumeAt(resumeTimestamp)
+                                    .build(),
+                                TransactionEvent::class.java,
+                            )
+                            // Process the elements of the Flux
+                            .flatMap { processEvent(it.body) }
+                            // Save resume token every n emitted elements
+                            .index { changeEventFluxIndex, changeEventDocument ->
+                                Pair(changeEventFluxIndex, changeEventDocument)
+                            }
+                            .flatMap { (changeEventFluxIndex, changeEventDocument) ->
+                                saveCdcResumeToken(changeEventFluxIndex, changeEventDocument)
+                            }
+                            .doOnError { logger.error("Error listening to change stream: ", it) }
+                    }
                 }
                 .retryWhen(
                     Retry.fixedDelay(
@@ -136,24 +138,26 @@ class EcommerceTransactionsLogEventsStream(
     private fun saveCdcResumeToken(
         changeEventFluxIndex: Long,
         changeEventDocument: TransactionEvent<*>,
-    ): Mono<TransactionEvent<*>> {
-        return Mono.defer {
-                if (changeEventFluxIndex.plus(1).mod(saveInterval) == 0) {
-                    val documentTimestamp = changeEventDocument.creationDate
-                    val resumeTimestamp =
+    ): Mono<TransactionEvent<*>> =
+        Mono.defer {
+                val resumeTimestamp =
+                    if (changeEventFluxIndex.plus(1).mod(saveInterval) == 0) {
+                        val documentTimestamp = changeEventDocument.creationDate
                         if (!documentTimestamp.isNullOrBlank()) {
                             ZonedDateTime.parse(documentTimestamp).toInstant()
                         } else {
                             Instant.now()
                         }
-                    redisResumePolicyService.saveResumeTimestamp(resumeTimestamp)
-                }
-                Mono.just(changeEventDocument)
+                    } else {
+                        null
+                    }
+                Mono.justOrEmpty(resumeTimestamp)
+                    .flatMap { redisResumePolicyService.saveResumeTimestamp(it!!) }
+                    .thenReturn(changeEventDocument)
             }
             .subscribeOn(Schedulers.boundedElastic())
             .onErrorResume {
                 logger.error("Error saving resume policy: ", it)
                 Mono.empty()
             }
-    }
 }
