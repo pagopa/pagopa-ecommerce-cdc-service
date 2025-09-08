@@ -135,7 +135,7 @@ microservice-chart:
     CDC_REDIS_RESUME_FALLBACK_IN_MIN: "60"
     CDC_REDIS_RESUME_TTL_IN_MIN: "1440"
     CDC_RESUME_SAVE_INTERVAL: "5"
-    ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME: "transactions-view-soak-tests-cdc"
+    ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME: "transactions-view"
   envSecret:
     OTEL_EXPORTER_OTLP_HEADERS: elastic-otel-token-header
     MONGO_PASSWORD: mongo-ecommerce-password
