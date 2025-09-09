@@ -84,14 +84,14 @@ stages:
               CONTAINER_REGISTRY_SERVICE_CONN: $(UAT_CONTAINER_REGISTRY_SERVICE_CONN)
               CONTAINER_REGISTRY_FQDN: $(UAT_CONTAINER_NAMESPACE)
               DOCKER_IMAGE_NAME: $(K8S_IMAGE_REPOSITORY_NAME)
-              DOCKER_IMAGE_TAG: cdctest-enableautoscaling
+              DOCKER_IMAGE_TAG: cdctest-improvememory
               FORCE_REPLACE_DOCKER_IMAGE: ${{ parameters.FORCE_REPLACE_DOCKER_IMAGE }}
 
   - stage: "Deploy_UAT_Green"
     displayName: 'UAT green deployment'
     dependsOn: [ Build_release_candidate ]
     variables:
-      app_version: cdctest-enableautoscaling
+      app_version: cdctest-improvememory
     jobs:
       - deployment: "Green_deployment"
         displayName: "Green deployment"
