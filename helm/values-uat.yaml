@@ -47,7 +47,7 @@ microservice-chart:
   ingress:
     create: true
     host: "weuuat.ecommerce.internal.uat.platform.pagopa.it"
-    path: /pagopa-ecommerce-cdc-service/(.*)
+    path: /beta/pagopa-ecommerce-cdc-service/(.*)
     servicePort: 8080
   serviceAccount:
     create: false
@@ -67,7 +67,7 @@ microservice-chart:
       memory: "512Mi"
       cpu: "600m"
   autoscaling:
-    enable: false
+    enable: true
     minReplica: 5
     maxReplica: 15
     pollingInterval: 10 # seconds
@@ -92,11 +92,11 @@ microservice-chart:
     OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service"
     OTEL_SERVICE_ENVIRONMENT: "uat"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=uat"
-    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.otel.svc:4317"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.elastic-system.svc:4317"
     OTEL_EXPORTER_OTLP_PROTOCOL: grpc
     OTEL_TRACES_EXPORTER: otlp
     OTEL_METRICS_EXPORTER: otlp
-    OTEL_LOGS_EXPORTER: otlp
+    OTEL_LOGS_EXPORTER: none
     OTEL_TRACES_SAMPLER: "always_on"
     CDC_LOG_EVENTS_COLLECTION_NAME: "eventstore"
     CDC_LOG_EVENTS_OPERATION_TYPE: "insert,update,replace"
