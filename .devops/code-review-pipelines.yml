@@ -45,18 +45,6 @@ stages:
                 sonar.coverage.jacoco.xmlReportPaths=./build/reports/jacoco/test/jacocoTestReport.xml
                 sonar.junit.reportPaths=./build/test-results/test
 
-          # install commons
-          - task: Gradle@3
-            displayName: 'Build and Install Commons Dependency'
-            inputs:
-              gradleWrapperFile: 'gradlew'
-              tasks: 'install-commons -PbuildCommons'
-              publishJUnitResults: false
-              codeCoverageToolOption: 'None'
-              sonarQubeRunAnalysis: false
-              javaHomeOption: 'JDKVersion'
-              jdkVersionOption: '1.21'
-
           # run the main build
           - task: Gradle@3
             displayName: 'Run Gradle build and tests'
@@ -70,6 +58,8 @@ stages:
               javaHomeOption: 'JDKVersion' # 'JDKVersion' | 'Path'. Alias: javaHomeSelection. Required. Set JAVA_HOME by. Default: JDKVersion.
               jdkVersionOption: '1.21' # 'default' | '1.11' | '1.10' | '1.9' | '1.8' | '1.7' | '1.6'. Alias: jdkVersion. Optional. Use when javaHomeSelection = JDKVersion. JDK version. Default: default.
               sonarQubeRunAnalysis: true
+            env:
+              GITHUB_TOKEN: $(GITHUB_RO_TOKEN)
 
           - task: SonarCloudPublish@3
             displayName: 'Publish SonarCloud results on build summary'
@@ -129,6 +119,8 @@ stages:
               pagopa-jwt-issuer-mock \
               -d
             displayName: 'eCommerce local docker compose up'
+            env:
+              GITHUB_TOKEN: $(GITHUB_RO_TOKEN)
 
           - script: |
               timeout 180 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:8099/actuator/health/liveness)" != "200" ]]; do sleep 5; done' || exit 1
