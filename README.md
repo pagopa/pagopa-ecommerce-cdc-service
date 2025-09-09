@@ -134,7 +134,7 @@ If you want to customize the application environment, reference this table:
 | CDC_REDIS_RESUME_TTL_IN_MIN                | Time to live in minutes of Redis items                                                                                                                     | long              |         |
 | CDC_RESUME_SAVE_INTERVAL                   | Interval with which the CDC saves resume token                                                                                                             | int               |         |
 | ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME | eCommerce collection name that will host the transaction view documents                                                                                    | string            |         |
-| GITHUB_TOKEN                               | GitHub Personal Access Token with packages:read permission for accessing pagopa-ecommerce-commons from GitHub Packages                                     | string            |         |
+
 (*): for Mongo connection string options
 see [docs](https://www.mongodb.com/docs/drivers/java/sync/v4.3/fundamentals/connection/connection-options/#connection-options)
 
