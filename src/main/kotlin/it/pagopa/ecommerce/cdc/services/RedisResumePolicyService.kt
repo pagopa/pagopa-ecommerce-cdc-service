@@ -30,7 +30,8 @@ class RedisResumePolicyService(
      * last successfully processed event after restarts or failures. If no timestamp is found in
      * Redis, it falls back to a configurable time window before the current time.
      *
-     * @return Instant representing the timestamp from which to resume change stream processing
+     * @return Mono<Instant> representing the timestamp from which to resume change stream
+     *   processing
      */
     override fun getResumeTimestamp(): Mono<Instant> {
         return redisTemplate
@@ -57,6 +58,7 @@ class RedisResumePolicyService(
      * called periodically during change stream processing to maintain resumption capability.
      *
      * @param timestamp The Instant timestamp to save for resume operations
+     * @return a Mono<Boolean> with true value iff the save operation was successfully completed
      */
     override fun saveResumeTimestamp(timestamp: Instant): Mono<Boolean> {
         logger.debug("Saving instant: {}", timestamp.toString())
