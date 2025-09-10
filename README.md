@@ -61,6 +61,18 @@ The service implements sophisticated conditional update logic:
 ### Prerequisites
 
 - Docker
+- GitHub personal access token with `packages:read` permission
+
+### GitHub Token Setup
+
+To access the `pagopa-ecommerce-commons` library from GitHub Packages, you need to set up authentication:
+
+1. Create a GitHub personal access token with `packages:read` permission
+2. Set the token as an environment variable:
+
+```shell
+export GITHUB_TOKEN=your_github_token_with_packages_read_permission
+```
 
 ### Populate the environment
 
@@ -140,7 +152,8 @@ these steps:
 
 2. Build and run the container:
    ```sh
-   docker build -t pagopa-ecommerce-cdc-service:latest .
+   export GITHUB_TOKEN=your_github_token_with_packages_read_permission
+   docker build --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN -t pagopa-ecommerce-cdc-service:latest .
    docker run --rm -p 8080:8080 \
      --env-file .env.dev \
      pagopa-ecommerce-cdc-service:latest
@@ -213,13 +226,9 @@ The CDC service is integrated into the local development environment and provide
 When running with the full environment, the CDC service connects to shared MongoDB and integrates with all other
 eCommerce services.
 
-### Install eCommerce commons library locally
+### eCommerce Commons Library
 
-There is a task into the Gradle build file that take cares for you of properly fetching and
-building `ecommerce-commons`. It does so by performing a repository clone, checking out to the version set into the
-build file and building the library with Maven.
-
-If you want to re-build `ecommerce-commons` library you can run the build command with a `-PbuildCommons`.
+The service uses the `ecommerce-commons` library which is now distributed via GitHub Packages. The library version is configured in `build.gradle.kts`.
 
 This two properties maps `ecommerce-commons` version and git ref:
 
@@ -234,12 +243,7 @@ with `"x.y.z"` will be checked out and installed locally.
 This value was left as a separate property because, during developing phases can be changed to a feature branch
 making the local build use a ref branch other than a tag for developing purpose.
 
-```Shell
-$ ./gradlew build -PbuildCommons
-```
-
-Running the above command the version above task will run before project compilation building eCommerce commons locally
-inside maven local repository
+The library is automatically downloaded from GitHub Packages during the build process using the configured GitHub token.
 
 ### Dependency management 🔧
 

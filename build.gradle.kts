@@ -1,11 +1,10 @@
-import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 group = "it.pagopa.ecommerce.cdc"
 
 description = "pagopa-ecommerce-cdc-service"
 
-version = "0.1.0-SNAPSHOT"
+version = "0.2.0-SNAPSHOT"
 
 plugins {
   id("java")
@@ -27,7 +26,14 @@ configurations { compileOnly { extendsFrom(configurations.annotationProcessor.ge
 
 repositories {
   mavenCentral()
-  mavenLocal()
+  maven {
+    name = "GitHubPackages"
+    url = uri("https://maven.pkg.github.com/pagopa/pagopa-ecommerce-commons")
+    credentials {
+      username = "token"
+      password = System.getenv("GITHUB_TOKEN")
+    }
+  }
 }
 
 dependencyLocking { lockAllConfigurations() }
@@ -40,7 +46,7 @@ object Dependencies {
 }
 
 // eCommerce commons library version
-val ecommerceCommonsVersion = "3.0.2"
+val ecommerceCommonsVersion = "3.2.0"
 
 // eCommerce commons library git ref (by default tag)
 val ecommerceCommonsGitRef = ecommerceCommonsVersion
@@ -80,14 +86,6 @@ configurations {
 kotlin { compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") } }
 
 tasks.withType<Test> { useJUnitPlatform() }
-
-tasks.register<Exec>("install-commons") {
-  description = "Installs the commons library for this project."
-  group = "commons"
-  val buildCommons = providers.gradleProperty("buildCommons")
-  onlyIf("To build commons library run gradle build -PbuildCommons") { buildCommons.isPresent }
-  commandLine("sh", "./pagopa-ecommerce-commons-maven-install.sh", ecommerceCommonsGitRef)
-}
 
 tasks
   .register("applySemanticVersionPlugin") { dependsOn("prepareKotlinBuildScriptModel") }
