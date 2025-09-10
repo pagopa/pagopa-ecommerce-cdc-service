@@ -2,21 +2,21 @@ package it.pagopa.ecommerce.cdc.services
 
 import java.time.Duration
 import java.time.Instant
-import java.util.*
-import kotlin.text.format
-import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.ReactiveRedisTemplate
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Mono
 
 @Component
-class TimestampRedisTemplate(private val redisTemplate: RedisTemplate<String, Instant>) {
-    fun save(keyspace: String, cdcTarget: String, instant: Instant, ttl: Duration) {
-        redisTemplate.opsForValue()[compoundKeyWithKeyspace(keyspace, cdcTarget), instant] = ttl
+class TimestampRedisTemplate(private val redisTemplate: ReactiveRedisTemplate<String, Instant>) {
+
+    fun save(keyspace: String, cdcTarget: String, instant: Instant, ttl: Duration): Mono<Boolean> {
+        return redisTemplate
+            .opsForValue()
+            .set(compoundKeyWithKeyspace(keyspace, cdcTarget), instant, ttl)
     }
 
-    fun findByKeyspaceAndTarget(keyspace: String, cdcTarget: String): Optional<Instant> {
-        return Optional.ofNullable(
-            redisTemplate.opsForValue()[compoundKeyWithKeyspace(keyspace, cdcTarget)]
-        )
+    fun findByKeyspaceAndTarget(keyspace: String, cdcTarget: String): Mono<Instant> {
+        return redisTemplate.opsForValue()[compoundKeyWithKeyspace(keyspace, cdcTarget)]
     }
 
     private fun compoundKeyWithKeyspace(keyspace: String, cdcTarget: String): String {
