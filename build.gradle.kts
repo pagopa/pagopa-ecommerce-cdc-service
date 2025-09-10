@@ -4,7 +4,7 @@ group = "it.pagopa.ecommerce.cdc"
 
 description = "pagopa-ecommerce-cdc-service"
 
-version = "0.1.0-SNAPSHOT"
+version = "0.1.1-SNAPSHOT"
 
 plugins {
   id("java")
