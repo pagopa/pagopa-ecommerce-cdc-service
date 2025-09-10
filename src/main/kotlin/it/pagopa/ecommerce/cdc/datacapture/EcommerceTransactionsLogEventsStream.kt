@@ -10,6 +10,7 @@ import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
 import java.time.Instant
 import java.time.ZonedDateTime
+import kotlinx.coroutines.reactor.mono
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.event.ApplicationReadyEvent
@@ -151,8 +152,8 @@ class EcommerceTransactionsLogEventsStream(
                     } else {
                         null
                     }
-                Mono.justOrEmpty(resumeTimestamp)
-                    .flatMap { redisResumePolicyService.saveResumeTimestamp(it!!) }
+                mono { resumeTimestamp }
+                    .flatMap { redisResumePolicyService.saveResumeTimestamp(it) }
                     .thenReturn(changeEventDocument)
             }
             .subscribeOn(Schedulers.boundedElastic())
