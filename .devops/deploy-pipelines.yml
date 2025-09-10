@@ -65,7 +65,6 @@ pool:
   vmImage: ubuntu-latest
 
 stages:
-
   # --- START Deploy UAT --- #
   - stage: "Build_release_candidate"
     displayName: 'Build release candidate'
