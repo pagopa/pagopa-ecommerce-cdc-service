@@ -76,8 +76,8 @@ stages:
       eq(${{parameters.UAT_PROD_DEPLOY}}, true)
       )
     jobs:
-      - job: Build_docker
-        displayName: Build docker with Build.SourceVersion as TAG
+      - job: "build"
+        displayName: 'Build release candidate docker image'
         steps:
           - task: Bash@3
             displayName: "Write GitHub token file"
@@ -87,10 +87,10 @@ stages:
                 echo "$(GITHUB_RO_TOKEN)" > ./github_ro_token
           - template: templates/docker-release/template.yaml@pagopaCommons
             parameters:
-              CONTAINER_REGISTRY_SERVICE_CONN: $(DEV_CONTAINER_REGISTRY_SERVICE_CONN)
-              CONTAINER_REGISTRY_FQDN: $(DEV_CONTAINER_NAMESPACE)
+              CONTAINER_REGISTRY_SERVICE_CONN: $(UAT_CONTAINER_REGISTRY_SERVICE_CONN)
+              CONTAINER_REGISTRY_FQDN: $(UAT_CONTAINER_NAMESPACE)
               DOCKER_IMAGE_NAME: $(K8S_IMAGE_REPOSITORY_NAME)
-              DOCKER_IMAGE_TAG: cdctest-100903
+              DOCKER_IMAGE_TAG: $(Build.SourceVersion)
               FORCE_REPLACE_DOCKER_IMAGE: ${{ parameters.FORCE_REPLACE_DOCKER_IMAGE }}
               DOCKER_BUILD_ARGS: --secret id=GITHUB_TOKEN,src=./github_ro_token
 
