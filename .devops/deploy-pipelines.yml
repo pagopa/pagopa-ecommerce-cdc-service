@@ -93,6 +93,7 @@ stages:
               DOCKER_IMAGE_TAG: cdctest-100903
               FORCE_REPLACE_DOCKER_IMAGE: ${{ parameters.FORCE_REPLACE_DOCKER_IMAGE }}
               DOCKER_BUILD_ARGS: --secret id=GITHUB_TOKEN,src=./github_ro_token
+
   - stage: "Deploy_UAT_Green"
     displayName: 'UAT green deployment'
     dependsOn: [ Build_release_candidate ]
