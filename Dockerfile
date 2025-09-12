@@ -12,7 +12,8 @@ COPY eclipse-style.xml eclipse-style.xml
 
 COPY src/ src/
 
-RUN --mount=type=secret,id=GITHUB_TOKEN,env=GITHUB_TOKEN \
+RUN --mount=type=secret,id=GITHUB_TOKEN \
+    GITHUB_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) \
     ./gradlew build -x test
 
 RUN mkdir build/extracted && java -Djarmode=layertools -jar build/libs/*[!-plain].jar extract --destination build/extracted
