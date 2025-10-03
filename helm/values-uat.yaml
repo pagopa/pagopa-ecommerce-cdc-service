@@ -38,7 +38,7 @@ microservice-chart:
     periodSeconds: 10
   deployment:
     create: true
-    replicas: 5
+    replicas: 3
   service:
     create: true
     type: ClusterIP
@@ -122,11 +122,11 @@ microservice-chart:
     REDIS_PORT: "6380"
     REDIS_SSL_ENABLED: "true"
     REDIS_SUB_CONN_MIN: "2"
-    REDIS_SUB_CONN_MAX: "10"
+    REDIS_SUB_CONN_MAX: "5"
     REDIS_SLAVE_CONN_MIN: "2"
-    REDIS_SLAVE_CONN_MAX: "10"
+    REDIS_SLAVE_CONN_MAX: "5"
     REDIS_MASTER_CONN_MIN: "2"
-    REDIS_MASTER_CONN_MAX: "10"
+    REDIS_MASTER_CONN_MAX: "5"
     CDC_REDIS_JOB_LOCK_KEYSPACE: "ecommerceCdcEventLock"
     CDC_REDIS_JOB_LOCK_TTL_MS: "600000"
     CDC_REDIS_JOB_LOCK_WAIT_TIME_MS: "100"
