@@ -1,5 +1,8 @@
 # pagopa-ecommerce-cdc-service
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=pagopa_pagopa-ecommerce-cdc-service&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=pagopa_pagopa-ecommerce-cdc-service)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=pagopa_pagopa-ecommerce-cdc-service&metric=coverage)](https://sonarcloud.io/summary/new_code?id=pagopa_pagopa-ecommerce-cdc-service)
+
 This repository is designed to manage and process events related to changes in ecommerce transactions event within the
 PagoPA ecommerce ecosystem. This service listens to events that signal changes (such as event creation) and ensures that
 these updates are appropriately handled in a (near) real-time manner.
