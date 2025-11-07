@@ -277,7 +277,10 @@ class TransactionViewUpsertService(
         update["paymentNotices"] = data.paymentNotices
         update["clientId"] = data.clientId
         update["creationDate"] = event.creationDate
-
+        if (data.userId != null) {
+            update["userId"] = data.userId
+            statusUpdate["userId"] = data.userId
+        }
         statusUpdate["email"] = data.email
         statusUpdate["paymentNotices"] = data.paymentNotices
         statusUpdate["clientId"] = data.clientId

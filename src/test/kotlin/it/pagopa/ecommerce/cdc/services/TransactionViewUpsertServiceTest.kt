@@ -28,6 +28,7 @@ import org.springframework.data.mongodb.core.query.Query
 import org.springframework.http.HttpStatus
 import reactor.core.publisher.Mono
 import reactor.test.StepVerifier
+import java.time.ZoneOffset
 
 class TransactionViewUpsertServiceTest {
 
@@ -335,6 +336,128 @@ class TransactionViewUpsertServiceTest {
 
         verify(mongoTemplate, times(0)).upsert(any(), any(), any(), any())
     }
+
+    @Test
+    fun `should perform upsert operation gathering data from transaction activated event when userId is present`() {
+        // pre-conditions
+        val event = TransactionTestUtils.transactionActivateEvent(
+            TransactionTestUtils.npgTransactionGatewayActivationData()
+        )
+
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        // stubbing
+        given(mongoTemplate.exists(eq(queryByTransactionId), any(), any()))
+            .willReturn(Mono.just(false))
+
+        given(
+            mongoTemplate.updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject["\$set"] as Document
+                    assertEquals(event.data.userId, setDocument["userId"])
+                    assertEquals(event.data.email, setDocument["email"])
+                    assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
+                    assertEquals(event.data.clientId, setDocument["clientId"])
+                    assertEquals(event.creationDate, setDocument["creationDate"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+        ).willReturn(Mono.just(UpdateResult.acknowledged(0L, 0L, null)))
+
+        given(
+            mongoTemplate.updateFirst(
+                eq(queryByTransactionId),
+                argThat { update ->
+                    val setDocument = update.updateObject["\$set"] as Document
+                    assertEquals(event.data.userId, setDocument["userId"])
+                    assertEquals(event.data.email, setDocument["email"])
+                    assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
+                    assertEquals(event.data.clientId, setDocument["clientId"])
+                    assertEquals(event.creationDate, setDocument["creationDate"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+        ).willReturn(Mono.just(UpdateResult.acknowledged(0L, 0L, null)))
+
+        given(
+            mongoTemplate.upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject["\$set"] as Document
+                    assertEquals(TransactionStatusDto.ACTIVATED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(event.data.email, setDocument["email"])
+                    assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
+                    assertEquals(event.data.clientId, setDocument["clientId"])
+                    assertEquals(event.creationDate, setDocument["creationDate"])
+                    assertEquals(event.data.userId, setDocument["userId"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+        ).willReturn(Mono.just(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId))))
+
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                any(),
+                any(),
+                any(),
+            )
+        verify(mongoTemplate, times(1))
+            .updateFirst(eq(queryByTransactionId), any(), any(), any())
+
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject["\$set"] as Document
+                    assertEquals(TransactionStatusDto.ACTIVATED, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(event.data.email, setDocument["email"])
+                    assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
+                    assertEquals(event.data.clientId, setDocument["clientId"])
+                    assertEquals(event.creationDate, setDocument["creationDate"])
+                    assertEquals(event.data.userId, setDocument["userId"])
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+    }
+
 
     // Authorization Requested
     @Test
