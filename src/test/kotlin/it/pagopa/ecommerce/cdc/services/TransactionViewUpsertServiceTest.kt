@@ -28,7 +28,6 @@ import org.springframework.data.mongodb.core.query.Query
 import org.springframework.http.HttpStatus
 import reactor.core.publisher.Mono
 import reactor.test.StepVerifier
-import java.time.ZoneOffset
 
 class TransactionViewUpsertServiceTest {
 
@@ -340,9 +339,10 @@ class TransactionViewUpsertServiceTest {
     @Test
     fun `should perform upsert operation gathering data from transaction activated event when userId is present`() {
         // pre-conditions
-        val event = TransactionTestUtils.transactionActivateEvent(
-            TransactionTestUtils.npgTransactionGatewayActivationData()
-        )
+        val event =
+            TransactionTestUtils.transactionActivateEvent(
+                TransactionTestUtils.npgTransactionGatewayActivationData()
+            )
 
         val queryByTransactionId =
             Query.query(Criteria.where("transactionId").`is`(event.transactionId))
@@ -363,61 +363,66 @@ class TransactionViewUpsertServiceTest {
             .willReturn(Mono.just(false))
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                argThat { update ->
-                    val setDocument = update.updateObject["\$set"] as Document
-                    assertEquals(event.data.userId, setDocument["userId"])
-                    assertEquals(event.data.email, setDocument["email"])
-                    assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
-                    assertEquals(event.data.clientId, setDocument["clientId"])
-                    assertEquals(event.creationDate, setDocument["creationDate"])
-                    true
-                },
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    argThat { update ->
+                        val setDocument = update.updateObject["\$set"] as Document
+                        assertEquals(event.data.userId, setDocument["userId"])
+                        assertEquals(event.data.email, setDocument["email"])
+                        assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
+                        assertEquals(event.data.clientId, setDocument["clientId"])
+                        assertEquals(event.creationDate, setDocument["creationDate"])
+                        true
+                    },
+                    eq(BaseTransactionView::class.java),
+                    eq(collectionName),
+                )
             )
-        ).willReturn(Mono.just(UpdateResult.acknowledged(0L, 0L, null)))
+            .willReturn(Mono.just(UpdateResult.acknowledged(0L, 0L, null)))
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionId),
-                argThat { update ->
-                    val setDocument = update.updateObject["\$set"] as Document
-                    assertEquals(event.data.userId, setDocument["userId"])
-                    assertEquals(event.data.email, setDocument["email"])
-                    assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
-                    assertEquals(event.data.clientId, setDocument["clientId"])
-                    assertEquals(event.creationDate, setDocument["creationDate"])
-                    true
-                },
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionId),
+                    argThat { update ->
+                        val setDocument = update.updateObject["\$set"] as Document
+                        assertEquals(event.data.userId, setDocument["userId"])
+                        assertEquals(event.data.email, setDocument["email"])
+                        assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
+                        assertEquals(event.data.clientId, setDocument["clientId"])
+                        assertEquals(event.creationDate, setDocument["creationDate"])
+                        true
+                    },
+                    eq(BaseTransactionView::class.java),
+                    eq(collectionName),
+                )
             )
-        ).willReturn(Mono.just(UpdateResult.acknowledged(0L, 0L, null)))
+            .willReturn(Mono.just(UpdateResult.acknowledged(0L, 0L, null)))
 
         given(
-            mongoTemplate.upsert(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                argThat { update ->
-                    val setDocument = update.updateObject["\$set"] as Document
-                    assertEquals(TransactionStatusDto.ACTIVATED, setDocument["status"])
-                    assertEquals(
-                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
-                        setDocument["lastProcessedEventAt"],
-                    )
-                    assertEquals(event.data.email, setDocument["email"])
-                    assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
-                    assertEquals(event.data.clientId, setDocument["clientId"])
-                    assertEquals(event.creationDate, setDocument["creationDate"])
-                    assertEquals(event.data.userId, setDocument["userId"])
-                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
-                    true
-                },
-                eq(BaseTransactionView::class.java),
-                eq(collectionName),
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    argThat { update ->
+                        val setDocument = update.updateObject["\$set"] as Document
+                        assertEquals(TransactionStatusDto.ACTIVATED, setDocument["status"])
+                        assertEquals(
+                            ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                            setDocument["lastProcessedEventAt"],
+                        )
+                        assertEquals(event.data.email, setDocument["email"])
+                        assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
+                        assertEquals(event.data.clientId, setDocument["clientId"])
+                        assertEquals(event.creationDate, setDocument["creationDate"])
+                        assertEquals(event.data.userId, setDocument["userId"])
+                        assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
+                        true
+                    },
+                    eq(BaseTransactionView::class.java),
+                    eq(collectionName),
+                )
             )
-        ).willReturn(Mono.just(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId))))
+            .willReturn(
+                Mono.just(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
+            )
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -432,8 +437,7 @@ class TransactionViewUpsertServiceTest {
                 any(),
                 any(),
             )
-        verify(mongoTemplate, times(1))
-            .updateFirst(eq(queryByTransactionId), any(), any(), any())
+        verify(mongoTemplate, times(1)).updateFirst(eq(queryByTransactionId), any(), any(), any())
 
         verify(mongoTemplate, times(1))
             .upsert(
@@ -457,7 +461,6 @@ class TransactionViewUpsertServiceTest {
                 eq(collectionName),
             )
     }
-
 
     // Authorization Requested
     @Test
