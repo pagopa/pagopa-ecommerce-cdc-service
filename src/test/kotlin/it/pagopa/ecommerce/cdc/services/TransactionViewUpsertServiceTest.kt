@@ -370,7 +370,6 @@ class TransactionViewUpsertServiceTest {
                     eq(queryByTransactionAndLastProcessedEventAtCondition),
                     argThat { update ->
                         val setDocument = update.updateObject["\$set"] as Document
-                        // 👇 userId should NOT be present when null
                         assertFalse(setDocument.containsKey("userId"))
                         assertEquals(event.data.email, setDocument["email"])
                         assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
@@ -412,7 +411,7 @@ class TransactionViewUpsertServiceTest {
                             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                             setDocument["lastProcessedEventAt"],
                         )
-                        assertFalse(setDocument.containsKey("userId")) // 👈 key change
+                        assertFalse(setDocument.containsKey("userId"))
                         assertEquals(event.data.email, setDocument["email"])
                         assertEquals(event.data.paymentNotices, setDocument["paymentNotices"])
                         assertEquals(event.data.clientId, setDocument["clientId"])
