@@ -63,7 +63,7 @@ resources:
     - repository: pagopaCheckoutTests
       type: github
       name: pagopa/pagopa-checkout-tests
-      ref: main
+      ref: CHK-4599-ecommerce-cdc-api-tests
       endpoint: 'io-azure-devops-github-ro'
 
 pool:
