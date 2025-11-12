@@ -156,6 +156,7 @@ stages:
             parameters:
               ENVIRONMENT: DEV
               CHECKOUT_RESOURCE_REPO_NAME: pagopaCheckoutTests
+              RUN_TEST_FOR: PAYMENT
 
   - stage: "E2E_Tests_Wallet_DEV_environment"
     displayName: 'Running Wallet E2E test on DEV env'
@@ -377,6 +378,7 @@ stages:
             parameters:
               ENVIRONMENT: UAT
               CHECKOUT_RESOURCE_REPO_NAME: pagopaCheckoutTests
+              RUN_TEST_FOR: PAYMENT
 
   - stage: "E2E_Tests_Wallet_UAT_environment"
     displayName: 'Running Wallet E2E test on UAT env'
