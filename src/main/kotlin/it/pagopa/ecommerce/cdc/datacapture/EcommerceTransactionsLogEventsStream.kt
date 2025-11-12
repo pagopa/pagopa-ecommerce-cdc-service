@@ -70,35 +70,51 @@ class EcommerceTransactionsLogEventsStream(
                     logger.info(
                         "Connecting to MongoDB Change Stream for collection: ${changeStreamOptionsConfig.collection}"
                     )
-                    redisResumePolicyService.getResumeTimestamp().flatMapMany { resumeTimestamp ->
-                        reactiveMongoTemplate
-                            .changeStream(
-                                changeStreamOptionsConfig.collection,
-                                ChangeStreamOptions.builder()
-                                    .filter(
-                                        Aggregation.newAggregation(
-                                            Aggregation.match(
-                                                Criteria.where("operationType")
-                                                    .`in`(changeStreamOptionsConfig.operationType)
-                                            ),
-                                            Aggregation.project(changeStreamOptionsConfig.project),
+                    redisResumePolicyService
+                        .getResumeTimestamp()
+                        .flatMapMany { resumeTimestamp ->
+                            reactiveMongoTemplate
+                                .changeStream(
+                                    changeStreamOptionsConfig.collection,
+                                    ChangeStreamOptions.builder()
+                                        .filter(
+                                            Aggregation.newAggregation(
+                                                Aggregation.match(
+                                                    Criteria.where("operationType")
+                                                        .`in`(
+                                                            changeStreamOptionsConfig.operationType
+                                                        )
+                                                ),
+                                                Aggregation.project(
+                                                    changeStreamOptionsConfig.project
+                                                ),
+                                            )
                                         )
-                                    )
-                                    .resumeAt(resumeTimestamp)
-                                    .build(),
-                                TransactionEvent::class.java,
-                            )
-                            // Process the elements of the Flux
-                            .flatMap { processEvent(it.body) }
-                            // Save resume token every n emitted elements
-                            .index { changeEventFluxIndex, changeEventDocument ->
-                                Pair(changeEventFluxIndex, changeEventDocument)
-                            }
-                            .flatMap { (changeEventFluxIndex, changeEventDocument) ->
-                                saveCdcResumeToken(changeEventFluxIndex, changeEventDocument)
-                            }
-                            .doOnError { logger.error("Error listening to change stream: ", it) }
-                    }
+                                        .resumeAt(resumeTimestamp)
+                                        .build(),
+                                    TransactionEvent::class.java,
+                                )
+                                .flatMap {
+                                    mono { it.body }
+                                        .onErrorResume { exception ->
+                                            logger.warn(
+                                                "Exception converting document to POJO, skipping document with id: [${it.raw?.fullDocument?.get("_id")}]",
+                                                exception,
+                                            )
+                                            Mono.empty()
+                                        }
+                                }
+                        }
+                        // Process the elements of the Flux
+                        .flatMap { processEvent(it) }
+                        // Save resume token every n emitted elements
+                        .index { changeEventFluxIndex, changeEventDocument ->
+                            Pair(changeEventFluxIndex, changeEventDocument)
+                        }
+                        .flatMap { (changeEventFluxIndex, changeEventDocument) ->
+                            saveCdcResumeToken(changeEventFluxIndex, changeEventDocument)
+                        }
+                        .doOnError { logger.error("Error listening to change stream: ", it) }
                 }
                 .retryWhen(
                     Retry.fixedDelay(
