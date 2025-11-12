@@ -53,12 +53,17 @@ class EcommerceCDCEventDispatcherService(
                     )
                     .doBeforeRetry { signal ->
                         logger.warn(
-                            "Retrying writing event on CDC queue due to: [{}]",
-                            signal.failure().message,
+                            "Retrying event processing for event with id: [${event.id}], transaction id: [${event.transactionId}] for error during process, attempt: [${signal.totalRetries()}/${retrySendPolicyConfig.maxAttempts}]",
+                            signal.failure(),
                         )
                     }
             )
-            .doOnError { e -> logger.error("Failed to send event after retries", e) }
+            .doOnError { e ->
+                logger.error(
+                    "Error processing event with id: [${event.id}], transaction id: [${event.transactionId}]",
+                    e,
+                )
+            }
             .map { event }
 
     /**
