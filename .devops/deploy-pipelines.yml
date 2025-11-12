@@ -65,6 +65,11 @@ resources:
       name: pagopa/pagopa-checkout-tests
       ref: CHK-4599-ecommerce-cdc-api-tests
       endpoint: 'io-azure-devops-github-ro'
+    - repository: pagopaWalletTests
+      type: github
+      name: pagopa/pagopa-wallet-tests
+      ref: CHK-4599-integration-test
+      endpoint: 'io-azure-devops-github-ro'
 
 pool:
   vmImage: ubuntu-latest
@@ -140,7 +145,7 @@ stages:
               TEST_FILE_PREFIX: "dev"
 
   - stage: "E2E_Tests_Checkout_DEV_environment"
-    displayName: 'Running E2E test on dev app'
+    displayName: 'Running Checkout E2E test on DEV env'
     pool:
       vmImage: 'ubuntu-latest'
     dependsOn: Deploy_for_DEV
@@ -151,6 +156,20 @@ stages:
             parameters:
               ENVIRONMENT: DEV
               CHECKOUT_RESOURCE_REPO_NAME: pagopaCheckoutTests
+
+  - stage: "E2E_Tests_Wallet_DEV_environment"
+    displayName: 'Running Wallet E2E test on DEV env'
+    pool:
+      vmImage: 'ubuntu-latest'
+    dependsOn: Deploy_for_DEV
+    jobs:
+      - job: e2e_tests
+        steps:
+          - template: .devops/azure-templates/e2e-tests.yaml@pagopaWalletTests
+            parameters:
+              ENVIRONMENT: DEV
+              CHECKOUT_RESOURCE_REPO_NAME: pagopaWalletTests
+              RUN_TEST_FOR: PAYMENT
   # --- END Deploy DEV --- #
 
   # --- START Deploy UAT --- #
@@ -346,7 +365,7 @@ stages:
               TEST_FILE_PREFIX: "green-uat"
 
   - stage: "E2E_Tests_Checkout_UAT_environment"
-    displayName: 'Running E2E test on uat app'
+    displayName: 'Running Checkout E2E test on UAT env'
     pool:
       vmImage: 'ubuntu-latest'
     dependsOn: Deploy_UAT_Green
@@ -358,6 +377,21 @@ stages:
             parameters:
               ENVIRONMENT: UAT
               CHECKOUT_RESOURCE_REPO_NAME: pagopaCheckoutTests
+
+  - stage: "E2E_Tests_Wallet_UAT_environment"
+    displayName: 'Running Wallet E2E test on UAT env'
+    pool:
+      vmImage: 'ubuntu-latest'
+    dependsOn: Deploy_UAT_Green
+    condition: eq(dependencies.Deploy_UAT_Green.result, 'Succeeded')
+    jobs:
+      - job: e2e_tests
+        steps:
+          - template: .devops/azure-templates/e2e-tests.yaml@pagopaWalletTests
+            parameters:
+              ENVIRONMENT: UAT
+              CHECKOUT_RESOURCE_REPO_NAME: pagopaWalletTests
+              RUN_TEST_FOR: PAYMENT
   # --- END Deploy UAT --- #
 
   # --- START Deploy PROD --- #
