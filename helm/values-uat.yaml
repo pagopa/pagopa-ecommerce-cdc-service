@@ -92,7 +92,7 @@ microservice-chart:
     OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service"
     OTEL_SERVICE_ENVIRONMENT: "uat"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=uat"
-    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.otel.svc:4317"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.elastic-system.svc:4317"
     OTEL_EXPORTER_OTLP_PROTOCOL: grpc
     OTEL_TRACES_EXPORTER: otlp
     OTEL_METRICS_EXPORTER: otlp
