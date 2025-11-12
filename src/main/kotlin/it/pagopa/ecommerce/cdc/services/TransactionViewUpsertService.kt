@@ -18,6 +18,7 @@ import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Update
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
+import reactor.kotlin.core.publisher.switchIfEmpty
 
 /**
  * Service for performing upsert operations on transaction views with efficient atomic upsert
@@ -68,9 +69,14 @@ class TransactionViewUpsertService(
             .flatMap { (update, updateStatus) ->
                 tryToUpdateExistingView(event, updateStatus, update).flatMap { updateResult ->
                     if (updateResult.modifiedCount == 0L) {
+                        logger.warn(
+                            "No document exists in view  for transactionId: [{}], try upsert",
+                            event.transactionId,
+                        )
                         upsertTransaction(
                                 event,
                                 updateStatus.set("_class", Transaction::class.java.canonicalName),
+                                update?.set("_class", Transaction::class.java.canonicalName),
                             )
                             .onErrorResume { Mono.empty() }
                             .filter { result -> result.upsertedId != null }
@@ -148,13 +154,31 @@ class TransactionViewUpsertService(
      *   in the view is before the creation date
      * @return Mono<UpdateResult> the update operation status
      */
-    private fun upsertTransaction(event: TransactionEvent<*>, statusUpdate: Update) =
-        mongoTemplate.upsert(
-            buildQuery(event, true),
-            statusUpdate,
-            BaseTransactionView::class.java,
-            transactionViewName,
-        )
+    private fun upsertTransaction(
+        event: TransactionEvent<*>,
+        statusUpdate: Update,
+        dataUpdate: Update?,
+    ) =
+        mongoTemplate
+            .upsert(
+                buildQuery(event, true),
+                statusUpdate,
+                BaseTransactionView::class.java,
+                transactionViewName,
+            )
+            .filter { result -> result.upsertedId != null }
+            .switchIfEmpty {
+                if (dataUpdate != null) {
+                    mongoTemplate.upsert(
+                        buildQuery(event, false),
+                        dataUpdate,
+                        BaseTransactionView::class.java,
+                        transactionViewName,
+                    )
+                } else {
+                    Mono.empty()
+                }
+            }
 
     /**
      * Updates view/enrichment data without timestamp constraints. View data can always be updated
@@ -538,7 +562,7 @@ class TransactionViewUpsertService(
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
 
         return Pair(null, statusUpdate)
-        // Doesn't update the state, but it has to be processed coditionally on its timestamp
+        // Doesn't update the state, but it has to be processed conditionally on its timestamp
     }
 
     /** Updates fields for TRANSACTION_CLOSURE_FAILED_EVENT. Adds closure failure information. */
@@ -569,7 +593,7 @@ class TransactionViewUpsertService(
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
         return Pair(null, statusUpdate)
-        // Doesn't update the state, but it has to be processed coditionally on its timestamp.
+        // Doesn't update the state, but it has to be processed conditionally on its timestamp.
         // Maybe it could be skipped
     }
 
@@ -583,7 +607,7 @@ class TransactionViewUpsertService(
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
         return Pair(null, statusUpdate)
-        // Doesn't update the state but it has to be processed coditionally on its timestamp.
+        // Doesn't update the state but it has to be processed conditionally on its timestamp.
         // Maybe it could be skipped
     }
 }
