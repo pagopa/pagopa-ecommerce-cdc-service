@@ -76,7 +76,6 @@ class TransactionViewUpsertService(
                         upsertTransaction(
                                 event,
                                 updateStatus.set("_class", Transaction::class.java.canonicalName),
-                                update?.set("_class", Transaction::class.java.canonicalName),
                             )
                             .onErrorResume { Mono.empty() }
                             .filter { result -> result.upsertedId != null }
@@ -154,31 +153,13 @@ class TransactionViewUpsertService(
      *   in the view is before the creation date
      * @return Mono<UpdateResult> the update operation status
      */
-    private fun upsertTransaction(
-        event: TransactionEvent<*>,
-        statusUpdate: Update,
-        dataUpdate: Update?,
-    ) =
-        mongoTemplate
-            .upsert(
-                buildQuery(event, true),
-                statusUpdate,
-                BaseTransactionView::class.java,
-                transactionViewName,
-            )
-            .filter { result -> result.upsertedId != null }
-            .switchIfEmpty {
-                if (dataUpdate != null) {
-                    mongoTemplate.upsert(
-                        buildQuery(event, false),
-                        dataUpdate,
-                        BaseTransactionView::class.java,
-                        transactionViewName,
-                    )
-                } else {
-                    Mono.empty()
-                }
-            }
+    private fun upsertTransaction(event: TransactionEvent<*>, statusUpdate: Update) =
+        mongoTemplate.upsert(
+            buildQuery(event, true),
+            statusUpdate,
+            BaseTransactionView::class.java,
+            transactionViewName,
+        )
 
     /**
      * Updates view/enrichment data without timestamp constraints. View data can always be updated
