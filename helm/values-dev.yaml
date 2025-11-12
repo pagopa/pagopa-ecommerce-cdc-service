@@ -33,7 +33,7 @@ microservice-chart:
     httpGet:
       path: /actuator/health/readiness
       port: 8080
-    initialDelaySeconds: 90
+    initialDelaySeconds: 40
     failureThreshold: 6
     periodSeconds: 10
   deployment:
@@ -64,7 +64,7 @@ microservice-chart:
       cpu: "300m"
     limits:
       memory: "512Mi"
-      cpu: "300m"
+      cpu: "900m"
   autoscaling:
     enable: false
     minReplica: 1
@@ -75,7 +75,13 @@ microservice-chart:
       - type: cpu
         metadata:
           type: Utilization # Allowed types are 'Utilization' or 'AverageValue'
-          value: "75"
+          value: "70"
+    advanced:
+      horizontalPodAutoscalerConfig:
+        behavior:
+          scaleUp:
+            stabilizationWindowSeconds: 60
+
   terminationGracePeriodSeconds: 30
   strategy:
     type: "RollingUpdate"
@@ -95,7 +101,7 @@ microservice-chart:
     CDC_LOG_EVENTS_COLLECTION_NAME: "eventstore"
     CDC_LOG_EVENTS_OPERATION_TYPE: "insert,update,replace"
     CDC_LOG_EVENTS_PROJECT: "fullDocument"
-    CDC_SEND_RETRY_MAX_ATTEMPTS: "1"
+    CDC_SEND_RETRY_MAX_ATTEMPTS: "10"
     CDC_SEND_RETRY_INTERVAL_IN_MS: "1000"
     CDC_STREAM_RETRY_MAX_ATTEMPTS: "15"
     CDC_STREAM_RETRY_INTERVAL_IN_MS: "60000"
@@ -126,8 +132,8 @@ microservice-chart:
     CDC_REDIS_JOB_LOCK_WAIT_TIME_MS: "100"
     CDC_REDIS_RESUME_KEYSPACE: "ecommerceCdcResume"
     CDC_REDIS_RESUME_TARGET: "eventstore"
-    CDC_REDIS_RESUME_FALLBACK_IN_MIN: "10"
-    CDC_REDIS_RESUME_TTL_IN_MIN: "1440"
+    CDC_REDIS_RESUME_FALLBACK_IN_MIN: "60"
+    CDC_REDIS_RESUME_TTL_IN_MIN: "4320" #3 days
     CDC_RESUME_SAVE_INTERVAL: "5"
     ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME: "transactions-view"
   envSecret:
