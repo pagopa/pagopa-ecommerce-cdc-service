@@ -1,7 +1,7 @@
 microservice-chart:
   namespace: "ecommerce"
-  nameOverride: ""
-  fullnameOverride: "pagopa-ecommerce-cdc-service"
+  nameOverride: "b-pagopa-ecommerce-cdc-service"
+  fullnameOverride: "b-pagopaecommercecdcservice"
   canaryDelivery:
     create: false
     ingress:
@@ -13,14 +13,14 @@ microservice-chart:
       weightPercent: 10
     image:
       repository: pagopaucommonacr.azurecr.io/pagopaecommercecdcservice
-      tag: "latest"
+      tag: "perf"
     envConfig:
       OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service-blue"
       OTEL_RESOURCE_ATTRIBUTES: "service.name=pagopa-ecommerce-cdc-service-blue,deployment.environment=uat"
     envSecret: {}
   image:
     repository: pagopaucommonacr.azurecr.io/pagopaecommercecdcservice
-    tag: "0.3.2"
+    tag: "perf"
     pullPolicy: Always
   livenessProbe:
     httpGet:
@@ -38,6 +38,7 @@ microservice-chart:
     periodSeconds: 10
   deployment:
     create: true
+    replicas: 3
   service:
     create: true
     type: ClusterIP
@@ -46,7 +47,7 @@ microservice-chart:
   ingress:
     create: true
     host: "weuuat.ecommerce.internal.uat.platform.pagopa.it"
-    path: /pagopa-ecommerce-cdc-service/(.*)
+    path: /beta/pagopa-ecommerce-cdc-service/(.*)
     servicePort: 8080
   serviceAccount:
     create: false
@@ -60,15 +61,15 @@ microservice-chart:
     allowPrivilegeEscalation: false
   resources:
     requests:
-      memory: "512Mi"
+      memory: "768Mi"
       cpu: "300m"
     limits:
-      memory: "512Mi"
-      cpu: "600m"
+      memory: "768Mi"
+      cpu: "900m"
   autoscaling:
-    enable: false
-    minReplica: 1
-    maxReplica: 1
+    enable: true
+    minReplica: 3
+    maxReplica: 15
     pollingInterval: 10 # seconds
     cooldownPeriod: 50 # seconds
     triggers:
@@ -76,6 +77,11 @@ microservice-chart:
         metadata:
           type: Utilization # Allowed types are 'Utilization' or 'AverageValue'
           value: "75"
+    advanced:
+      horizontalPodAutoscalerConfig:
+        behavior:
+          scaleUp:
+            stabilizationWindowSeconds: 60
   terminationGracePeriodSeconds: 30
   strategy:
     type: "RollingUpdate"
@@ -86,16 +92,16 @@ microservice-chart:
     OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service"
     OTEL_SERVICE_ENVIRONMENT: "uat"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=uat"
-    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.otel.svc:4317"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.elastic-system.svc:4317"
     OTEL_EXPORTER_OTLP_PROTOCOL: grpc
     OTEL_TRACES_EXPORTER: otlp
     OTEL_METRICS_EXPORTER: otlp
-    OTEL_LOGS_EXPORTER: otlp
+    OTEL_LOGS_EXPORTER: none
     OTEL_TRACES_SAMPLER: "always_on"
     CDC_LOG_EVENTS_COLLECTION_NAME: "eventstore"
     CDC_LOG_EVENTS_OPERATION_TYPE: "insert,update,replace"
     CDC_LOG_EVENTS_PROJECT: "fullDocument"
-    CDC_SEND_RETRY_MAX_ATTEMPTS: "1"
+    CDC_SEND_RETRY_MAX_ATTEMPTS: "100"
     CDC_SEND_RETRY_INTERVAL_IN_MS: "1000"
     CDC_STREAM_RETRY_MAX_ATTEMPTS: "15"
     CDC_STREAM_RETRY_INTERVAL_IN_MS: "60000"
@@ -115,12 +121,12 @@ microservice-chart:
     REDIS_PROTOCOL: "rediss"
     REDIS_PORT: "6380"
     REDIS_SSL_ENABLED: "true"
-    REDIS_SUB_CONN_MIN: "4"
-    REDIS_SUB_CONN_MAX: "24"
-    REDIS_SLAVE_CONN_MIN: "4"
-    REDIS_SLAVE_CONN_MAX: "24"
-    REDIS_MASTER_CONN_MIN: "4"
-    REDIS_MASTER_CONN_MAX: "24"
+    REDIS_SUB_CONN_MIN: "2"
+    REDIS_SUB_CONN_MAX: "5"
+    REDIS_SLAVE_CONN_MIN: "2"
+    REDIS_SLAVE_CONN_MAX: "5"
+    REDIS_MASTER_CONN_MIN: "2"
+    REDIS_MASTER_CONN_MAX: "5"
     CDC_REDIS_JOB_LOCK_KEYSPACE: "ecommerceCdcEventLock"
     CDC_REDIS_JOB_LOCK_TTL_MS: "600000"
     CDC_REDIS_JOB_LOCK_WAIT_TIME_MS: "100"
@@ -128,8 +134,8 @@ microservice-chart:
     CDC_REDIS_RESUME_TARGET: "eventstore"
     CDC_REDIS_RESUME_FALLBACK_IN_MIN: "60"
     CDC_REDIS_RESUME_TTL_IN_MIN: "1440"
-    CDC_RESUME_SAVE_INTERVAL: "5"
-    ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME: "transactions-view-cdc"
+    CDC_RESUME_SAVE_INTERVAL: "200"
+    ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME: "transactions-view"
   envSecret:
     OTEL_EXPORTER_OTLP_HEADERS: elastic-otel-token-header
     MONGO_PASSWORD: mongo-ecommerce-password
