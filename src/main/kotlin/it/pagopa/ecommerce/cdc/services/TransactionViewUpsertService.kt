@@ -84,11 +84,18 @@ class TransactionViewUpsertService(
                     }
                 }
             }
-            .switchIfEmpty(
-                Mono.error {
-                    CdcQueryMatchException("Query didn't match any condition to update the view")
+            .switchIfEmpty{
+                //TODO continua da qui: il retry deve esser fatto solo per quelle query che aggiornano la parte di dati oltre quello di stato
+                //se aggiorna solo stato non ha senso fare retry e si possono interrompere
+                if(updateStatus==null){
+    Mono.empty()
+                }else{
+                    Mono.error {
+                        CdcQueryMatchException("Query didn't match any condition to update the view")
+                    }
                 }
-            )
+
+            }
             .doOnNext { updateResult ->
                 logger.debug(
                     "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
