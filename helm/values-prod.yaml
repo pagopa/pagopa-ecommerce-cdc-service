@@ -81,7 +81,6 @@ microservice-chart:
         behavior:
           scaleUp:
             stabilizationWindowSeconds: 60
-
   terminationGracePeriodSeconds: 30
   strategy:
     type: "RollingUpdate"
