@@ -544,7 +544,7 @@ class EcommerceTransactionsLogEventsStreamTest {
         lenient().whenever(mockEvent.raw).thenReturn(mockRaw)
         lenient().whenever(mockEvent.body).thenThrow(IllegalArgumentException("cannot parse event"))
         given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
-
+        val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
         given(
                 reactiveMongoTemplate.changeStream(
                     any<String>(),
@@ -552,7 +552,11 @@ class EcommerceTransactionsLogEventsStreamTest {
                     eq(TransactionEvent::class.java),
                 )
             )
-            .willReturn(Flux.just(mockEvent as ChangeStreamEvent<TransactionEvent<*>>))
+            .willReturn(
+                Flux.fromIterable(
+                    listOf(mockEvent as ChangeStreamEvent<TransactionEvent<*>>, changeStreamEvent)
+                )
+            )
 
         given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
@@ -562,9 +566,9 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
         // flux should complete with an empty result, skipping event
-        StepVerifier.create(result).verifyComplete()
+        StepVerifier.create(result).expectNext(event).verifyComplete()
 
-        verify(cdcLockService, times(0)).acquireEventLock(any())
-        verify(ecommerceCDCEventDispatcherService, times(0)).dispatchEvent(event)
+        verify(cdcLockService, times(1)).acquireEventLock(event.id)
+        verify(ecommerceCDCEventDispatcherService, times(1)).dispatchEvent(event)
     }
 }
