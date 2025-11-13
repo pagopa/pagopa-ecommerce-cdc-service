@@ -8,7 +8,6 @@ import it.pagopa.ecommerce.commons.documents.v2.*
 import it.pagopa.ecommerce.commons.documents.v2.authorization.NpgTransactionGatewayAuthorizationData
 import it.pagopa.ecommerce.commons.documents.v2.authorization.RedirectTransactionGatewayAuthorizationData
 import it.pagopa.ecommerce.commons.generated.server.model.TransactionStatusDto
-import java.time.ZonedDateTime
 import kotlinx.coroutines.reactor.mono
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -19,6 +18,7 @@ import org.springframework.data.mongodb.core.query.Update
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
 import reactor.kotlin.core.publisher.switchIfEmpty
+import java.time.ZonedDateTime
 
 /**
  * Service for performing upsert operations on transaction views with efficient atomic upsert
@@ -50,7 +50,7 @@ class TransactionViewUpsertService(
      * 1. Building update operations based on the specific event type
      * 2. Attempting conditional update with timestamp validation (lastProcessedEventAt)
      * 3. Falling back to upsert when no modification occurs for new transactions
-     * 4. Throwing CdcQueryMatchException if no update conditions are met
+     * 4. Throwing CdcQueryMatchException if no update conditions are met - this error triggers retry
      *
      * @param event The transaction event containing update data and metadata
      * @return Mono<UpdateResult> The result of the update/upsert operation
@@ -76,12 +76,12 @@ class TransactionViewUpsertService(
                                 event.id,
                             )
                             upsertTransaction(
-                                    event,
-                                    statusUpdate.set(
-                                        "_class",
-                                        Transaction::class.java.canonicalName,
-                                    ),
-                                )
+                                event,
+                                statusUpdate.set(
+                                    "_class",
+                                    Transaction::class.java.canonicalName,
+                                ),
+                            )
                                 .onErrorResume { Mono.empty() }
                                 .filter { result -> result.upsertedId != null }
                         } else {
@@ -92,9 +92,22 @@ class TransactionViewUpsertService(
                         /* @formatter:off
                            here update query have failed because of no document matched update criteria (aka where conditions on update)
                            this can be caused by racing condition processing view update from concurrent event processing.
-                           Those errors are transitory and can be retried in order to allow for view data update.
-                           A retry here should be performed only for those events that carry a "data update" that can be performed without updating
-                           view status (so when dataUpdate is not null), for those that have only status update there is no need to perform retry
+                           Those errors are transitory and can be retried in order to allow for event write operation to be processed successfully also
+                           for skipped event.
+                           |A|      |B|     |DB|    case A, concurrency between A and B update, write happens in right order
+                            |------->|------->| t0 -> both A and B events updates are processed simultaneously
+                            |   OK   |   X    | t1 -> A update is processed correctly, B no
+                            |   OK   |------->| t2 -> B operation is retried and status update saved successfully into view
+                            |   OK   |   OK   |
+                            |        |        |      case B, concurrency between A and B update, write happens in inverted order
+                            |------->|------->| t0 -> both A and B events updates are processed simultaneously
+                            |   X    |   OK   | t1 -> B update is processed correctly, A no
+                            |        |------->| t2 -> A operation is retried. If event A have dataUpdate (that is, update for fields that are not overridden by other events)
+                            |   X    |   OK   |       this update will be done, otherwise update will fail
+                            |   X    |   OK   |       (meaning that all fields that fields update query A want to write are overwritten by subsequent event, such as status)
+                            |   X    |   OK   |       this can lead to data loss
+                            | (ko on |        |
+                            | retry) |   OK   |
                            @formatter:on
                         */
                         Mono.error {
@@ -163,6 +176,11 @@ class TransactionViewUpsertService(
     }
 
     /**
+     * This method perform an upsert operation where update query is performed with
+     * lastProcessedEventAt where condition (to ensure event write ordering) saving a new document
+     * if no document matches the where condition (so when no document exists for given
+     * transactionId)
+     *
      * @param event The MongoDB change stream event document
      * @param statusUpdate the update status and data to save on the db, if the lastProcessedEventAt
      *   in the view is before the creation date
@@ -178,7 +196,8 @@ class TransactionViewUpsertService(
 
     /**
      * Updates view/enrichment data without timestamp constraints. View data can always be updated
-     * as it doesn't affect transaction state.
+     * in any order since updated fields are not overridden by other events, so order does not
+     * count.
      *
      * @param event The MongoDB change stream event document
      * @param dataUpdate the update data to save on the db, regardless the lastProcessedEventAt in
@@ -198,7 +217,14 @@ class TransactionViewUpsertService(
     }
 
     /**
-     * Method to try to update an existing view
+     * Method to perform update query against view. Based on input parameter different update
+     * strategies are attempt:
+     * * both status update and data update parameters values -> first attempt to perform status
+     *   update (that is, update that contains also fields that are overridden by other events, so
+     *   update must be done in chronological order) in case of failure an attempt to update data
+     *   update is performed (that is, update that contains field that are not overridden by other
+     *   events, so resulting query will not have where for ordered write operations)
+     * * status update only values -> as above but only status update query is performed
      *
      * @param event The MongoDB change stream event document
      * @param statusUpdate the update status and data to save on the db, if the lastProcessedEventAt
