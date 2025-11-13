@@ -33,7 +33,7 @@ microservice-chart:
     httpGet:
       path: /actuator/health/readiness
       port: 8080
-    initialDelaySeconds: 90
+    initialDelaySeconds: 40
     failureThreshold: 6
     periodSeconds: 10
   deployment:
@@ -64,7 +64,7 @@ microservice-chart:
       cpu: "300m"
     limits:
       memory: "512Mi"
-      cpu: "300m"
+      cpu: "900m"
   autoscaling:
     enable: false
     minReplica: 1
@@ -75,7 +75,13 @@ microservice-chart:
       - type: cpu
         metadata:
           type: Utilization # Allowed types are 'Utilization' or 'AverageValue'
-          value: "75"
+          value: "70"
+    advanced:
+      horizontalPodAutoscalerConfig:
+        behavior:
+          scaleUp:
+            stabilizationWindowSeconds: 60
+
   terminationGracePeriodSeconds: 30
   strategy:
     type: "RollingUpdate"
@@ -83,6 +89,9 @@ microservice-chart:
       maxSurge: 1
       maxUnavailable: 0
   envConfig:
+    ROOT_LOGGING_LEVEL: "INFO"
+    APP_LOGGING_LEVEL: "INFO"
+    WEB_LOGGING_LEVEL: "INFO"
     OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service"
     OTEL_SERVICE_ENVIRONMENT: "dev"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=dev"
@@ -95,7 +104,7 @@ microservice-chart:
     CDC_LOG_EVENTS_COLLECTION_NAME: "eventstore"
     CDC_LOG_EVENTS_OPERATION_TYPE: "insert,update,replace"
     CDC_LOG_EVENTS_PROJECT: "fullDocument"
-    CDC_SEND_RETRY_MAX_ATTEMPTS: "1"
+    CDC_SEND_RETRY_MAX_ATTEMPTS: "10"
     CDC_SEND_RETRY_INTERVAL_IN_MS: "1000"
     CDC_STREAM_RETRY_MAX_ATTEMPTS: "15"
     CDC_STREAM_RETRY_INTERVAL_IN_MS: "60000"
@@ -115,21 +124,21 @@ microservice-chart:
     REDIS_PROTOCOL: "rediss"
     REDIS_PORT: "6380"
     REDIS_SSL_ENABLED: "true"
-    REDIS_SUB_CONN_MIN: "1"
-    REDIS_SUB_CONN_MAX: "12"
-    REDIS_SLAVE_CONN_MIN: "1"
-    REDIS_SLAVE_CONN_MAX: "12"
-    REDIS_MASTER_CONN_MIN: "1"
-    REDIS_MASTER_CONN_MAX: "12"
+    REDIS_SUB_CONN_MIN: "2"
+    REDIS_SUB_CONN_MAX: "5"
+    REDIS_SLAVE_CONN_MIN: "2"
+    REDIS_SLAVE_CONN_MAX: "5"
+    REDIS_MASTER_CONN_MIN: "2"
+    REDIS_MASTER_CONN_MAX: "5"
     CDC_REDIS_JOB_LOCK_KEYSPACE: "ecommerceCdcEventLock"
     CDC_REDIS_JOB_LOCK_TTL_MS: "600000"
     CDC_REDIS_JOB_LOCK_WAIT_TIME_MS: "100"
     CDC_REDIS_RESUME_KEYSPACE: "ecommerceCdcResume"
     CDC_REDIS_RESUME_TARGET: "eventstore"
-    CDC_REDIS_RESUME_FALLBACK_IN_MIN: "10"
-    CDC_REDIS_RESUME_TTL_IN_MIN: "1440"
+    CDC_REDIS_RESUME_FALLBACK_IN_MIN: "60"
+    CDC_REDIS_RESUME_TTL_IN_MIN: "4320" #3 days
     CDC_RESUME_SAVE_INTERVAL: "5"
-    ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME: "transactions-view-cdc"
+    ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME: "transactions-view"
   envSecret:
     OTEL_EXPORTER_OTLP_HEADERS: elastic-otel-token-header
     MONGO_PASSWORD: mongo-ecommerce-password

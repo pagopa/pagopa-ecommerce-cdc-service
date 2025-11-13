@@ -64,18 +64,24 @@ microservice-chart:
       cpu: "300m"
     limits:
       memory: "512Mi"
-      cpu: "600m"
+      cpu: "900m"
   autoscaling:
     enable: true
     minReplica: 3
-    maxReplica: 5
+    maxReplica: 15
     pollingInterval: 10 # seconds
     cooldownPeriod: 50 # seconds
     triggers:
       - type: cpu
         metadata:
           type: Utilization # Allowed types are 'Utilization' or 'AverageValue'
-          value: "75"
+          value: "70"
+    advanced:
+      horizontalPodAutoscalerConfig:
+        behavior:
+          scaleUp:
+            stabilizationWindowSeconds: 60
+
   terminationGracePeriodSeconds: 30
   strategy:
     type: "RollingUpdate"
@@ -83,6 +89,9 @@ microservice-chart:
       maxSurge: 2
       maxUnavailable: 0
   envConfig:
+    ROOT_LOGGING_LEVEL: "INFO"
+    APP_LOGGING_LEVEL: "INFO"
+    WEB_LOGGING_LEVEL: "INFO"
     OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service"
     OTEL_SERVICE_ENVIRONMENT: "prod"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=prod"
@@ -95,7 +104,7 @@ microservice-chart:
     CDC_LOG_EVENTS_COLLECTION_NAME: "eventstore"
     CDC_LOG_EVENTS_OPERATION_TYPE: "insert,update,replace"
     CDC_LOG_EVENTS_PROJECT: "fullDocument"
-    CDC_SEND_RETRY_MAX_ATTEMPTS: "1"
+    CDC_SEND_RETRY_MAX_ATTEMPTS: "10"
     CDC_SEND_RETRY_INTERVAL_IN_MS: "1000"
     CDC_STREAM_RETRY_MAX_ATTEMPTS: "15"
     CDC_STREAM_RETRY_INTERVAL_IN_MS: "60000"
@@ -115,17 +124,15 @@ microservice-chart:
     REDIS_PROTOCOL: "rediss"
     REDIS_PORT: "6380"
     REDIS_SSL_ENABLED: "true"
-    # TODO fine-tune redis lock values after soak tests
-    REDIS_SUB_CONN_MIN: "4"
-    REDIS_SUB_CONN_MAX: "36"
-    REDIS_SLAVE_CONN_MIN: "4"
-    REDIS_SLAVE_CONN_MAX: "36"
-    REDIS_MASTER_CONN_MIN: "4"
-    REDIS_MASTER_CONN_MAX: "36"
+    REDIS_SUB_CONN_MIN: "2"
+    REDIS_SUB_CONN_MAX: "5"
+    REDIS_SLAVE_CONN_MIN: "2"
+    REDIS_SLAVE_CONN_MAX: "5"
+    REDIS_MASTER_CONN_MIN: "2"
+    REDIS_MASTER_CONN_MAX: "5"
     CDC_REDIS_JOB_LOCK_KEYSPACE: "ecommerceCdcEventLock"
     CDC_REDIS_JOB_LOCK_TTL_MS: "600000"
     CDC_REDIS_JOB_LOCK_WAIT_TIME_MS: "100"
-    # TODO fine-tune redis resume values after soak tests
     CDC_REDIS_RESUME_KEYSPACE: "ecommerceCdcResume"
     CDC_REDIS_RESUME_TARGET: "eventstore"
     CDC_REDIS_RESUME_FALLBACK_IN_MIN: "60"
