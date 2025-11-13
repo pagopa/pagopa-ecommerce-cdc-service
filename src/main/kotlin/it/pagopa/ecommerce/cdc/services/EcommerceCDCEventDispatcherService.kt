@@ -1,6 +1,7 @@
 package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
+import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
 import org.slf4j.Logger
@@ -51,6 +52,13 @@ class EcommerceCDCEventDispatcherService(
                         retrySendPolicyConfig.maxAttempts,
                         Duration.ofMillis(retrySendPolicyConfig.intervalInMs),
                     )
+                    .filter { t ->
+                        if (t is CdcQueryMatchException) {
+                            t.retriableError
+                        } else {
+                            true
+                        }
+                    }
                     .doBeforeRetry { signal ->
                         logger.warn(
                             "Retrying event processing for event with id: [${event.id}], transaction id: [${event.transactionId}] for error during process, attempt: [${signal.totalRetries()}/${retrySendPolicyConfig.maxAttempts}]",

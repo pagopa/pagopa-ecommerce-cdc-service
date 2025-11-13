@@ -66,35 +66,44 @@ class TransactionViewUpsertService(
         )
 
         return buildUpdateFromEvent(event)
-            .flatMap { (update, updateStatus) ->
-                tryToUpdateExistingView(event, updateStatus, update).flatMap { updateResult ->
-                    if (updateResult.modifiedCount == 0L) {
-                        logger.warn(
-                            "No document exists in view  for transactionId: [{}], try upsert",
-                            event.transactionId,
-                        )
-                        upsertTransaction(
-                                event,
-                                updateStatus.set("_class", Transaction::class.java.canonicalName),
+            .flatMap { (dataUpdate, statusUpdate) ->
+                tryToUpdateExistingView(event, statusUpdate, dataUpdate)
+                    .flatMap { updateResult ->
+                        if (updateResult.modifiedCount == 0L) {
+                            logger.warn(
+                                "No document exists in view  for transactionId: [{}], try upsert",
+                                event.transactionId,
                             )
-                            .onErrorResume { Mono.empty() }
-                            .filter { result -> result.upsertedId != null }
-                    } else {
-                        Mono.just(updateResult)
+                            upsertTransaction(
+                                    event,
+                                    statusUpdate.set(
+                                        "_class",
+                                        Transaction::class.java.canonicalName,
+                                    ),
+                                )
+                                .onErrorResume { Mono.empty() }
+                                .filter { result -> result.upsertedId != null }
+                        } else {
+                            Mono.just(updateResult)
+                        }
                     }
-                }
-            }
-            .switchIfEmpty{
-                //TODO continua da qui: il retry deve esser fatto solo per quelle query che aggiornano la parte di dati oltre quello di stato
-                //se aggiorna solo stato non ha senso fare retry e si possono interrompere
-                if(updateStatus==null){
-    Mono.empty()
-                }else{
-                    Mono.error {
-                        CdcQueryMatchException("Query didn't match any condition to update the view")
+                    .switchIfEmpty {
+                        /* @formatter:off
+                           here update query have failed because of no document matched update criteria (aka where conditions on update)
+                           this can be caused by racing condition processing view update from concurrent event processing.
+                           Those errors are transitory and can be retried in order to allow for view data update.
+                           A retry here should be performed only for those events that carry a "data update" that can be performed without updating
+                           view status (so when dataUpdate is not null), for those that have only status update there is no need to perform retry
+                           @formatter:on
+                        */
+                        val shouldRetry = dataUpdate != null
+                        Mono.error {
+                            CdcQueryMatchException(
+                                message = "Query didn't match any condition to update the view",
+                                retriableError = shouldRetry,
+                            )
+                        }
                     }
-                }
-
             }
             .doOnNext { updateResult ->
                 logger.debug(
