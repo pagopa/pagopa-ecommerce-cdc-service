@@ -10,4 +10,4 @@ package it.pagopa.ecommerce.cdc.exceptions
  * @param throwable The underlying cause, if any
  */
 class CdcEventTypeException(message: String, throwable: Throwable? = null) :
-    RuntimeException(message, throwable)
+    CdcException(message = message, throwable = throwable, retriableError = false)

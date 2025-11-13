@@ -1,7 +1,7 @@
 package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
-import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
+import it.pagopa.ecommerce.cdc.exceptions.CdcException
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
 import org.slf4j.Logger
@@ -53,7 +53,7 @@ class EcommerceCDCEventDispatcherService(
                         Duration.ofMillis(retrySendPolicyConfig.intervalInMs),
                     )
                     .filter { t ->
-                        if (t is CdcQueryMatchException) {
+                        if (t is CdcException) {
                             t.retriableError
                         } else {
                             true

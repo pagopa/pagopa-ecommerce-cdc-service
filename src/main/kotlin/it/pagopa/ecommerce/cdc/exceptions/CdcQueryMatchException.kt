@@ -9,5 +9,5 @@ package it.pagopa.ecommerce.cdc.exceptions
 class CdcQueryMatchException(
     message: String,
     throwable: Throwable? = null,
-    val retriableError: Boolean,
-) : RuntimeException(message, throwable)
+    override val retriableError: Boolean,
+) : CdcException(message = message, throwable = throwable, retriableError = retriableError)
