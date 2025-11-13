@@ -8,6 +8,7 @@ import it.pagopa.ecommerce.commons.documents.v2.*
 import it.pagopa.ecommerce.commons.documents.v2.authorization.NpgTransactionGatewayAuthorizationData
 import it.pagopa.ecommerce.commons.documents.v2.authorization.RedirectTransactionGatewayAuthorizationData
 import it.pagopa.ecommerce.commons.generated.server.model.TransactionStatusDto
+import java.time.ZonedDateTime
 import kotlinx.coroutines.reactor.mono
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -18,7 +19,6 @@ import org.springframework.data.mongodb.core.query.Update
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
 import reactor.kotlin.core.publisher.switchIfEmpty
-import java.time.ZonedDateTime
 
 /**
  * Service for performing upsert operations on transaction views with efficient atomic upsert
@@ -50,7 +50,8 @@ class TransactionViewUpsertService(
      * 1. Building update operations based on the specific event type
      * 2. Attempting conditional update with timestamp validation (lastProcessedEventAt)
      * 3. Falling back to upsert when no modification occurs for new transactions
-     * 4. Throwing CdcQueryMatchException if no update conditions are met - this error triggers retry
+     * 4. Throwing CdcQueryMatchException if no update conditions are met - this error triggers
+     *    retry
      *
      * @param event The transaction event containing update data and metadata
      * @return Mono<UpdateResult> The result of the update/upsert operation
@@ -76,12 +77,12 @@ class TransactionViewUpsertService(
                                 event.id,
                             )
                             upsertTransaction(
-                                event,
-                                statusUpdate.set(
-                                    "_class",
-                                    Transaction::class.java.canonicalName,
-                                ),
-                            )
+                                    event,
+                                    statusUpdate.set(
+                                        "_class",
+                                        Transaction::class.java.canonicalName,
+                                    ),
+                                )
                                 .onErrorResume { Mono.empty() }
                                 .filter { result -> result.upsertedId != null }
                         } else {

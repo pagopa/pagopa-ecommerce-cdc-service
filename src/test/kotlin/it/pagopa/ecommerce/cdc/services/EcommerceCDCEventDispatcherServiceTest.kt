@@ -7,6 +7,7 @@ import it.pagopa.ecommerce.cdc.exceptions.CdcEventTypeException
 import it.pagopa.ecommerce.cdc.exceptions.CdcException
 import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
+import java.util.stream.Stream
 import kotlinx.coroutines.reactor.mono
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -16,7 +17,6 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import reactor.core.publisher.Mono
 import reactor.test.StepVerifier
-import java.util.stream.Stream
 
 @ExtendWith(MockitoExtension::class)
 class EcommerceCDCEventDispatcherServiceTest {
