@@ -71,8 +71,9 @@ class TransactionViewUpsertService(
                     .flatMap { updateResult ->
                         if (updateResult.modifiedCount == 0L) {
                             logger.warn(
-                                "No document exists in view  for transactionId: [{}], try upsert",
+                                "No document updated for transactionId: [{}] processing event with id: [{}], trying upsert",
                                 event.transactionId,
+                                event.id,
                             )
                             upsertTransaction(
                                     event,
@@ -96,11 +97,9 @@ class TransactionViewUpsertService(
                            view status (so when dataUpdate is not null), for those that have only status update there is no need to perform retry
                            @formatter:on
                         */
-                        val shouldRetry = dataUpdate != null
                         Mono.error {
                             CdcQueryMatchException(
-                                message = "Query didn't match any condition to update the view",
-                                retriableError = shouldRetry,
+                                message = "Query didn't match any condition to update the view"
                             )
                         }
                     }
@@ -240,7 +239,7 @@ class TransactionViewUpsertService(
      * This method implements the conditional update strategy where:
      * - Event data is updated regardless of timestamp if the event being processed contains more
      *   info than the current one
-     * - Status updates are conditional based on event chronological order
+     * - Status updates are conditionally based on event chronological order
      *
      * @param event The transaction event containing update data and metadata
      * @return Mono of a pair of update objects with field updates based on event type
@@ -523,8 +522,10 @@ class TransactionViewUpsertService(
         when (event.data.responseOutcome) {
             TransactionUserReceiptData.Outcome.OK ->
                 statusUpdate["status"] = TransactionStatusDto.NOTIFIED_OK
+
             TransactionUserReceiptData.Outcome.KO ->
                 statusUpdate["status"] = TransactionStatusDto.NOTIFIED_KO
+
             else -> {} // throw exception
         }
         statusUpdate["lastProcessedEventAt"] =

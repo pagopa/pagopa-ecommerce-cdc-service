@@ -6,8 +6,5 @@ package it.pagopa.ecommerce.cdc.exceptions
  * @param message Details about the query matching failure
  * @param throwable The underlying cause, if any
  */
-class CdcQueryMatchException(
-    message: String,
-    throwable: Throwable? = null,
-    override val retriableError: Boolean,
-) : CdcException(message = message, throwable = throwable, retriableError = retriableError)
+class CdcQueryMatchException(message: String, throwable: Throwable? = null) :
+    CdcException(message = message, throwable = throwable, retriableError = true)
