@@ -1,7 +1,7 @@
 package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
-import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
+import it.pagopa.ecommerce.cdc.exceptions.CdcException
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
 import org.slf4j.Logger
@@ -52,15 +52,26 @@ class EcommerceCDCEventDispatcherService(
                         retrySendPolicyConfig.maxAttempts,
                         Duration.ofMillis(retrySendPolicyConfig.intervalInMs),
                     )
-                    .filter { t -> t is Exception && t !is CdcQueryMatchException }
+                    .filter { t ->
+                        if (t is CdcException) {
+                            t.retriableError
+                        } else {
+                            true
+                        }
+                    }
                     .doBeforeRetry { signal ->
                         logger.warn(
-                            "Retrying writing event on CDC queue due to: [{}]",
-                            signal.failure().message,
+                            "Retrying event processing for event with id: [${event.id}], transaction id: [${event.transactionId}] for error during process, attempt: [${signal.totalRetries()}/${retrySendPolicyConfig.maxAttempts}]",
+                            signal.failure(),
                         )
                     }
             )
-            .doOnError { e -> logger.error("Failed to send event after retries", e) }
+            .doOnError { e ->
+                logger.error(
+                    "Error processing event with id: [${event.id}], transaction id: [${event.transactionId}]",
+                    e,
+                )
+            }
             .map { event }
 
     /**

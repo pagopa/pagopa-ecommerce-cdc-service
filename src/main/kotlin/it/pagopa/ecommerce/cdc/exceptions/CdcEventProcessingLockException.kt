@@ -7,4 +7,4 @@ package it.pagopa.ecommerce.cdc.exceptions
  * @param throwable The underlying cause of the lock failure, if any
  */
 sealed class CdcEventProcessingLockException(message: String, throwable: Throwable? = null) :
-    RuntimeException(message, throwable)
+    CdcException(message = message, throwable = throwable, retriableError = false)

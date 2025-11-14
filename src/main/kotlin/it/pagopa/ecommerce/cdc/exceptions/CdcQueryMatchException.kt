@@ -7,4 +7,4 @@ package it.pagopa.ecommerce.cdc.exceptions
  * @param throwable The underlying cause, if any
  */
 class CdcQueryMatchException(message: String, throwable: Throwable? = null) :
-    RuntimeException(message, throwable)
+    CdcException(message = message, throwable = throwable, retriableError = true)
