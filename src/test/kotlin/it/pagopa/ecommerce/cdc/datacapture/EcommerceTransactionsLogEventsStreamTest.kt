@@ -1,6 +1,8 @@
 package it.pagopa.ecommerce.cdc.datacapture
 
 import com.mongodb.MongoException
+import com.mongodb.client.model.changestream.ChangeStreamDocument
+import com.mongodb.client.model.changestream.OperationType
 import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
 import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
 import it.pagopa.ecommerce.cdc.services.CdcLockService
@@ -9,19 +11,24 @@ import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createMockChangeStreamEvent
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createMockChangeStreamEventWithNullDocument
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.createSampleEventStoreEvent
+import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil.toDocument
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
 import java.time.Instant
 import java.time.ZonedDateTime
 import kotlin.test.assertEquals
+import org.bson.Document
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mockito
+import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
+import org.springframework.data.mongodb.core.ChangeStreamEvent
 import org.springframework.data.mongodb.core.ChangeStreamOptions
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Hooks
 import reactor.core.publisher.Mono
 import reactor.test.StepVerifier
 
@@ -523,5 +530,45 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         // Verify that event dispatching still occurred for all events
         verify(ecommerceCDCEventDispatcherService, times(3)).dispatchEvent(any())
+    }
+
+    @Test
+    fun `should handle document parsing errors`() {
+        Hooks.onOperatorDebug()
+        val event = createSampleEventStoreEvent()
+        val document = toDocument(event)
+        val mockEvent = mock<ChangeStreamEvent<TransactionEvent<Any>>>()
+        val mockRaw = mock<ChangeStreamDocument<Document>>()
+        lenient().whenever(mockRaw.fullDocument).thenReturn(document)
+        lenient().whenever(mockEvent.operationType).thenReturn(OperationType.valueOf("INSERT"))
+        lenient().whenever(mockEvent.raw).thenReturn(mockRaw)
+        lenient().whenever(mockEvent.body).thenThrow(IllegalArgumentException("cannot parse event"))
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
+        val changeStreamEvent = createMockChangeStreamEvent(operationType = "insert", event = event)
+        given(
+                reactiveMongoTemplate.changeStream(
+                    any<String>(),
+                    any<ChangeStreamOptions>(),
+                    eq(TransactionEvent::class.java),
+                )
+            )
+            .willReturn(
+                Flux.fromIterable(
+                    listOf(mockEvent as ChangeStreamEvent<TransactionEvent<*>>, changeStreamEvent)
+                )
+            )
+
+        given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
+
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(event)).willAnswer {
+            Mono.just(it.arguments[0])
+        }
+
+        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
+        // flux should complete with an empty result, skipping event
+        StepVerifier.create(result).expectNext(event).verifyComplete()
+
+        verify(cdcLockService, times(1)).acquireEventLock(event.id)
+        verify(ecommerceCDCEventDispatcherService, times(1)).dispatchEvent(event)
     }
 }
