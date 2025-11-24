@@ -457,7 +457,14 @@ class TransactionViewUpsertService(
     /** Updates fields for TRANSACTION_EXPIRED_EVENT. Adds expiration information. */
     private fun updateExpiredData(event: TransactionExpiredEvent): Pair<Update?, Update> {
         val statusUpdate = Update()
-        statusUpdate["status"] = TransactionStatusDto.EXPIRED
+        val targetViewStatus =
+            when (event.data.statusBeforeExpiration) {
+                TransactionStatusDto.ACTIVATED -> TransactionStatusDto.EXPIRED_NOT_AUTHORIZED
+                TransactionStatusDto.CANCELLATION_REQUESTED ->
+                    TransactionStatusDto.CANCELLATION_EXPIRED
+                else -> TransactionStatusDto.EXPIRED
+            }
+        statusUpdate["status"] = targetViewStatus
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
         return Pair(null, statusUpdate)

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertNull
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.ArgumentMatchers.anyString
@@ -119,7 +120,7 @@ class TransactionViewUpsertServiceTest {
                 ),
                 Pair(
                     TransactionTestUtils.transactionExpiredEvent(TransactionStatusDto.ACTIVATED),
-                    TransactionStatusDto.EXPIRED,
+                    TransactionStatusDto.EXPIRED_NOT_AUTHORIZED,
                 ),
                 Pair(
                     TransactionTestUtils.transactionRefundRequestedEvent(baseTransaction),
@@ -2457,6 +2458,101 @@ class TransactionViewUpsertServiceTest {
                 argThat { update ->
                     val setDocument = update.updateObject[$$"$set"] as Document
                     if (status != null) assertEquals(status, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
+                    true
+                },
+                eq(BaseTransactionView::class.java),
+                eq(collectionName),
+            )
+    }
+
+    @ParameterizedTest
+    @EnumSource(TransactionStatusDto::class)
+    fun `should update view for expired event with EXPIRED event for non-final transaction updates`(
+        status: TransactionStatusDto
+    ) {
+        val event = TransactionTestUtils.transactionExpiredEvent(status)
+        val expectedStatus =
+            when (status) {
+                TransactionStatusDto.ACTIVATED -> TransactionStatusDto.EXPIRED_NOT_AUTHORIZED
+                TransactionStatusDto.CANCELLATION_REQUESTED ->
+                    TransactionStatusDto.CANCELLATION_EXPIRED
+                else -> TransactionStatusDto.EXPIRED
+            }
+        val queryByTransactionId =
+            Query.query(Criteria.where("transactionId").`is`(event.transactionId))
+
+        val queryByTransactionAndLastProcessedEventAtCondition =
+            Query.query(
+                Criteria.where("transactionId")
+                    .`is`(event.transactionId)
+                    .orOperator(
+                        Criteria.where("lastProcessedEventAt").exists(false),
+                        Criteria.where("lastProcessedEventAt")
+                            .lt(ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()),
+                    )
+            )
+
+        given(
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
+
+        given(
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
+
+        // pre-conditions
+        given(mongoTemplate.upsert(any(), any(), any(), any()))
+            .willReturn(
+                Mono.just(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
+            )
+        // test
+        StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
+            .expectNext(UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)))
+            .verifyComplete()
+
+        // verifications
+        verify(mongoTemplate, times(1))
+            .updateFirst(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(expectedStatus, setDocument["status"])
+                    assertEquals(
+                        ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
+                        setDocument["lastProcessedEventAt"],
+                    )
+                    assertEquals(Transaction::class.java.canonicalName, setDocument["_class"])
+                    true
+                },
+                any(),
+                any(),
+            )
+        verify(mongoTemplate, times(0)).updateFirst(eq(queryByTransactionId), any(), any(), any())
+        verify(mongoTemplate, times(1))
+            .upsert(
+                eq(queryByTransactionAndLastProcessedEventAtCondition),
+                argThat { update ->
+                    val setDocument = update.updateObject[$$"$set"] as Document
+                    assertEquals(expectedStatus, setDocument["status"])
                     assertEquals(
                         ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli(),
                         setDocument["lastProcessedEventAt"],
