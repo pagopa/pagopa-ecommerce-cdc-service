@@ -13,7 +13,7 @@ class ViewUpdateTracingUtils(val openTelemetryUtils: OpenTelemetryUtils) {
         val CDC_EVENT_STORE_PROCESSED_EVENT_CODE_ATTRIBUTE_KEY =
             AttributeKey.stringKey("ecommerce.cdc.processedEvent.eventCode")
         val CDC_EVENT_STORE_PROCESSED_EVENT_TRANSACTION_ID_ATTRIBUTE_KEY =
-            AttributeKey.stringKey("ecommerce.cdc.processedEvent.eventId")
+            AttributeKey.stringKey("ecommerce.cdc.processedEvent.transactionId")
         val CDC_EVENT_STORE_PROCESSED_EVENT_CREATION_DATE_ATTRIBUTE_KEY =
             AttributeKey.stringKey("ecommerce.cdc.processedEvent.eventCreationDate")
         val CDC_EVENT_STORE_PROCESSED_EVENT_OUTCOME_ATTRIBUTE_KEY =
