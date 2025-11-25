@@ -10,8 +10,7 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 class OpenTelemetryConfiguration {
 
-    @Bean
-    fun openTelemetry(): OpenTelemetry = GlobalOpenTelemetry.get()
+    @Bean fun openTelemetry(): OpenTelemetry = GlobalOpenTelemetry.get()
 
     @Bean
     fun openTelemetryTracer(openTelemetry: OpenTelemetry): Tracer =

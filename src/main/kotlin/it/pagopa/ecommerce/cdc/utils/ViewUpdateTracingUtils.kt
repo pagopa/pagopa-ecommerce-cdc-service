@@ -7,20 +7,38 @@ import it.pagopa.ecommerce.commons.utils.OpenTelemetryUtils
 import org.springframework.stereotype.Component
 
 @Component
-class ViewUpdateTracingUtils(
-    val openTelemetryUtils: OpenTelemetryUtils
-) {
+class ViewUpdateTracingUtils(val openTelemetryUtils: OpenTelemetryUtils) {
     companion object {
-        const val CDC_EVENT_STORE_PROCESSED_EVENT_SPAN_NAME = "CDC event store processed event"
+        const val CDC_EVENT_STORE_PROCESSED_EVENT_SPAN_NAME = "eventstoreCDCEvent"
+        const val CDC_EVENT_STORE_PROCESSED_VIEW_SPAN_NAME = "eventstoreCDCView"
         val CDC_EVENT_STORE_PROCESSED_EVENT_CODE_ATTRIBUTE_KEY =
             AttributeKey.stringKey("ecommerce.cdc.processedEvent.eventCode")
+        val CDC_EVENT_STORE_PROCESSED_EVENT_TRANSACTION_ID_ATTRIBUTE_KEY =
+            AttributeKey.stringKey("ecommerce.cdc.processedEvent.eventId")
+        val CDC_EVENT_STORE_PROCESSED_EVENT_CREATION_DATE_ATTRIBUTE_KEY =
+            AttributeKey.stringKey("ecommerce.cdc.processedEvent.eventCreationDate")
+        val CDC_EVENT_STORE_PROCESSED_VIEW_OUTCOME_ATTRIBUTE_KEY =
+            AttributeKey.stringKey("ecommerce.cdc.processedView.outcome")
     }
-
 
     fun addSpanForProcessedEvent(event: TransactionEvent<*>) {
         openTelemetryUtils.addSpanWithAttributes(
             CDC_EVENT_STORE_PROCESSED_EVENT_SPAN_NAME,
-            Attributes.of(CDC_EVENT_STORE_PROCESSED_EVENT_CODE_ATTRIBUTE_KEY, event.eventCode)
+            Attributes.of(
+                CDC_EVENT_STORE_PROCESSED_EVENT_CODE_ATTRIBUTE_KEY,
+                event.eventCode,
+                CDC_EVENT_STORE_PROCESSED_EVENT_TRANSACTION_ID_ATTRIBUTE_KEY,
+                event.transactionId,
+                CDC_EVENT_STORE_PROCESSED_EVENT_CREATION_DATE_ATTRIBUTE_KEY,
+                event.creationDate,
+            ),
+        )
+    }
+
+    fun addSpanForProcessedView(outcome: String) {
+        openTelemetryUtils.addSpanWithAttributes(
+            CDC_EVENT_STORE_PROCESSED_VIEW_SPAN_NAME,
+            Attributes.of(CDC_EVENT_STORE_PROCESSED_VIEW_OUTCOME_ATTRIBUTE_KEY, outcome),
         )
     }
 }

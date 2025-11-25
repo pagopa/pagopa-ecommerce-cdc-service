@@ -2,12 +2,14 @@ package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
 import it.pagopa.ecommerce.cdc.exceptions.CdcException
+import it.pagopa.ecommerce.cdc.utils.ViewUpdateTracingUtils
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Mono
+import reactor.core.publisher.SignalType
 import reactor.util.retry.Retry
 
 /**
@@ -20,6 +22,7 @@ import reactor.util.retry.Retry
 class EcommerceCDCEventDispatcherService(
     private val retrySendPolicyConfig: RetrySendPolicyConfig,
     private val transactionViewUpsertService: TransactionViewUpsertService,
+    private val viewUpdateTracingUtils: ViewUpdateTracingUtils,
 ) {
 
     private val logger: Logger = LoggerFactory.getLogger(javaClass)
@@ -112,6 +115,11 @@ class EcommerceCDCEventDispatcherService(
                     transactionId,
                     error,
                 )
+            }
+            .doFinally { signalType ->
+                val status = if (signalType == SignalType.ON_ERROR) "ERROR" else "OK"
+                viewUpdateTracingUtils.addSpanForProcessedEvent(event)
+                viewUpdateTracingUtils.addSpanForProcessedView(status)
             }
             .then(Mono.just(event))
     }
