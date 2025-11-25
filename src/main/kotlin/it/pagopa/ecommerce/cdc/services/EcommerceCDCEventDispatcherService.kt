@@ -117,9 +117,8 @@ class EcommerceCDCEventDispatcherService(
                 )
             }
             .doFinally { signalType ->
-                val status = if (signalType == SignalType.ON_ERROR) "ERROR" else "OK"
-                viewUpdateTracingUtils.addSpanForProcessedEvent(event)
-                viewUpdateTracingUtils.addSpanForProcessedView(status)
+                val outcome = if (signalType == SignalType.ON_ERROR) "ERROR" else "OK"
+                viewUpdateTracingUtils.addSpanForProcessedEvent(event, outcome)
             }
             .then(Mono.just(event))
     }

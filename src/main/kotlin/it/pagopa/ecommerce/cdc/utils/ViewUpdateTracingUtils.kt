@@ -10,18 +10,17 @@ import org.springframework.stereotype.Component
 class ViewUpdateTracingUtils(val openTelemetryUtils: OpenTelemetryUtils) {
     companion object {
         const val CDC_EVENT_STORE_PROCESSED_EVENT_SPAN_NAME = "eventstoreCDCEvent"
-        const val CDC_EVENT_STORE_PROCESSED_VIEW_SPAN_NAME = "eventstoreCDCView"
         val CDC_EVENT_STORE_PROCESSED_EVENT_CODE_ATTRIBUTE_KEY =
             AttributeKey.stringKey("ecommerce.cdc.processedEvent.eventCode")
         val CDC_EVENT_STORE_PROCESSED_EVENT_TRANSACTION_ID_ATTRIBUTE_KEY =
             AttributeKey.stringKey("ecommerce.cdc.processedEvent.eventId")
         val CDC_EVENT_STORE_PROCESSED_EVENT_CREATION_DATE_ATTRIBUTE_KEY =
             AttributeKey.stringKey("ecommerce.cdc.processedEvent.eventCreationDate")
-        val CDC_EVENT_STORE_PROCESSED_VIEW_OUTCOME_ATTRIBUTE_KEY =
-            AttributeKey.stringKey("ecommerce.cdc.processedView.outcome")
+        val CDC_EVENT_STORE_PROCESSED_EVENT_OUTCOME_ATTRIBUTE_KEY =
+            AttributeKey.stringKey("ecommerce.cdc.processedEvent.outcome")
     }
 
-    fun addSpanForProcessedEvent(event: TransactionEvent<*>) {
+    fun addSpanForProcessedEvent(event: TransactionEvent<*>, outcome: String) {
         openTelemetryUtils.addSpanWithAttributes(
             CDC_EVENT_STORE_PROCESSED_EVENT_SPAN_NAME,
             Attributes.of(
@@ -31,14 +30,9 @@ class ViewUpdateTracingUtils(val openTelemetryUtils: OpenTelemetryUtils) {
                 event.transactionId,
                 CDC_EVENT_STORE_PROCESSED_EVENT_CREATION_DATE_ATTRIBUTE_KEY,
                 event.creationDate,
+                CDC_EVENT_STORE_PROCESSED_EVENT_OUTCOME_ATTRIBUTE_KEY,
+                outcome,
             ),
-        )
-    }
-
-    fun addSpanForProcessedView(outcome: String) {
-        openTelemetryUtils.addSpanWithAttributes(
-            CDC_EVENT_STORE_PROCESSED_VIEW_SPAN_NAME,
-            Attributes.of(CDC_EVENT_STORE_PROCESSED_VIEW_OUTCOME_ATTRIBUTE_KEY, outcome),
         )
     }
 }
