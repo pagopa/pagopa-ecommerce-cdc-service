@@ -187,7 +187,7 @@ class EcommerceTransactionsLogEventsStreamTest {
         val changeStreamEvent1 =
             createMockChangeStreamEvent(operationType = "insert", event = event1)
         val changeStreamEvent2 =
-            createMockChangeStreamEvent(operationType = "update", event = event2)
+            createMockChangeStreamEvent(operationType = "insert", event = event2)
         given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
 
         given(
@@ -570,5 +570,44 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         verify(cdcLockService, times(1)).acquireEventLock(event.id)
         verify(ecommerceCDCEventDispatcherService, times(1)).dispatchEvent(event)
+    }
+
+    @Test
+    fun `should skip events with ttl field set (marked as to be expired by scheduler service)`() {
+        Hooks.onOperatorDebug()
+        val event = createSampleEventStoreEvent()
+        val document = toDocument(event)
+        document["ttl"] = 123456
+        val mockEvent = mock<ChangeStreamEvent<TransactionEvent<Any>>>()
+        val mockRaw = mock<ChangeStreamDocument<Document>>()
+        lenient().whenever(mockRaw.fullDocument).thenReturn(document)
+        lenient().whenever(mockEvent.operationType).thenReturn(OperationType.valueOf("INSERT"))
+        lenient().whenever(mockEvent.raw).thenReturn(mockRaw)
+        given(redisResumePolicyService.getResumeTimestamp()).willReturn(Mono.just(Instant.now()))
+        given(
+                reactiveMongoTemplate.changeStream(
+                    any<String>(),
+                    any<ChangeStreamOptions>(),
+                    eq(TransactionEvent::class.java),
+                )
+            )
+            .willReturn(
+                Flux.fromIterable(listOf(mockEvent as ChangeStreamEvent<TransactionEvent<*>>))
+            )
+
+        given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
+
+        given(ecommerceCDCEventDispatcherService.dispatchEvent(event)).willAnswer {
+            Mono.just(it.arguments[0])
+        }
+
+        val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
+        // flux should complete with an empty result, skipping event
+        StepVerifier.create(result).verifyComplete()
+
+        verify(cdcLockService, times(0)).acquireEventLock(event.id)
+        verify(ecommerceCDCEventDispatcherService, times(0)).dispatchEvent(event)
+        // filtered out before reaching document-to-pojo conversion
+        verify(mockEvent, times(0)).body
     }
 }
