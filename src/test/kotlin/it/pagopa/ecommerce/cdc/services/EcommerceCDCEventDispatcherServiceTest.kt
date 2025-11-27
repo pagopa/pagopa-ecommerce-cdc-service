@@ -7,6 +7,7 @@ import it.pagopa.ecommerce.cdc.exceptions.CdcEventTypeException
 import it.pagopa.ecommerce.cdc.exceptions.CdcException
 import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
 import it.pagopa.ecommerce.cdc.utils.EcommerceChangeStreamDocumentUtil
+import it.pagopa.ecommerce.cdc.utils.ViewUpdateTracingUtils
 import java.util.stream.Stream
 import kotlinx.coroutines.reactor.mono
 import org.junit.jupiter.api.Test
@@ -23,8 +24,13 @@ class EcommerceCDCEventDispatcherServiceTest {
 
     private val retrySendPolicyConfig = RetrySendPolicyConfig(maxAttempts = 3, intervalInMs = 100)
     private val transactionViewUpsertService: TransactionViewUpsertService = mock()
+    private val viewUpdateTracingUtils: ViewUpdateTracingUtils = mock()
     private val ecommerceCDCEventDispatcherService: EcommerceCDCEventDispatcherService =
-        EcommerceCDCEventDispatcherService(retrySendPolicyConfig, transactionViewUpsertService)
+        EcommerceCDCEventDispatcherService(
+            retrySendPolicyConfig,
+            transactionViewUpsertService,
+            viewUpdateTracingUtils,
+        )
 
     @Test
     fun `should successfully dispatch and process transaction event`() {

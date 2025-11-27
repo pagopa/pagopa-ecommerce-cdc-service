@@ -98,7 +98,11 @@ class EcommerceTransactionsLogEventsStream(
                                     mono { it.body }
                                         .onErrorResume { exception ->
                                             logger.warn(
-                                                "Exception converting document to POJO, skipping document with id: [${it.raw?.fullDocument?.get("_id")}]",
+                                                "Exception converting document to POJO, skipping document with id: [${
+                                                it.raw?.fullDocument?.get(
+                                                    "_id"
+                                                )
+                                            }]",
                                                 exception,
                                             )
                                             Mono.empty()
