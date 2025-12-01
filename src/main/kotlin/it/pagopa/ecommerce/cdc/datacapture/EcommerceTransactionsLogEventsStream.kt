@@ -94,14 +94,32 @@ class EcommerceTransactionsLogEventsStream(
                                         .build(),
                                     TransactionEvent::class.java,
                                 )
+                                .filter {
+                                    /*
+                                       @formatter:off
+                                       events are immutable, once written they are never update by eCommerce application
+                                       except for the data migration process that set TTL at document level.
+                                       this update is seen as an update operation and this is the reason for this filter as per CDC listening operations
+                                       list this cannot be set to insert only as it produce an error at CDC configuration level
+                                       see here https://learn.microsoft.com/en-us/answers/questions/356668/how-to-get-inserted-change-stream-data-use-cosmosd
+                                       unfortunately the operationType returned by CosmosDB driver is null, so no filter can be done on operationType field.
+                                       For this reason an applicative filter have been applied here to exclude all those document that have ttl field set:
+                                       eCommerce services does not set ttl field explicitly saving event to event store so when a detected changed document
+                                       contains TTL field valued it can be skipped
+                                    */
+                                    val fullDocument = it.raw?.fullDocument
+                                    val skipDocument = fullDocument?.containsKey("ttl") ?: false
+                                    if (skipDocument) {
+                                        logger.info("Skip event: {}", fullDocument)
+                                    }
+                                    return@filter !skipDocument
+                                }
                                 .flatMap {
                                     mono { it.body }
                                         .onErrorResume { exception ->
                                             logger.warn(
-                                                "Exception converting document to POJO, skipping document with id: [${
-                                                it.raw?.fullDocument?.get(
-                                                    "_id"
-                                                )
+                                                "Exception converting document to POJO, skipping document: [${
+                                                it.raw?.fullDocument.toString()
                                             }]",
                                                 exception,
                                             )
