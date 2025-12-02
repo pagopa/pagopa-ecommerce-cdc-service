@@ -1,7 +1,7 @@
 microservice-chart:
   namespace: "ecommerce"
   nameOverride: ""
-  fullnameOverride: "pagopa-ecommerce-cdc-service"
+  fullnameOverride: "pagopa-ecommerce-cdc-service-soak"
   canaryDelivery:
     create: false
     ingress:
@@ -92,7 +92,7 @@ microservice-chart:
     ROOT_LOGGING_LEVEL: "INFO"
     APP_LOGGING_LEVEL: "INFO"
     WEB_LOGGING_LEVEL: "INFO"
-    OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service-beta"
+    OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service-soak"
     OTEL_SERVICE_ENVIRONMENT: "uat"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=uat"
     OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.elastic-system.svc:4317"
@@ -130,10 +130,10 @@ microservice-chart:
     REDIS_SLAVE_CONN_MAX: "5"
     REDIS_MASTER_CONN_MIN: "2"
     REDIS_MASTER_CONN_MAX: "5"
-    CDC_REDIS_JOB_LOCK_KEYSPACE: "ecommerceCdcEventLock-beta"
+    CDC_REDIS_JOB_LOCK_KEYSPACE: "ecommerceCdcEventLock-soak"
     CDC_REDIS_JOB_LOCK_TTL_MS: "600000"
     CDC_REDIS_JOB_LOCK_WAIT_TIME_MS: "100"
-    CDC_REDIS_RESUME_KEYSPACE: "ecommerceCdcResume-beta"
+    CDC_REDIS_RESUME_KEYSPACE: "ecommerceCdcResume-soak"
     CDC_REDIS_RESUME_TARGET: "eventstore"
     CDC_REDIS_RESUME_FALLBACK_IN_MIN: "525600" #1 year
     CDC_REDIS_RESUME_TTL_IN_MIN: "60"
