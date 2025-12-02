@@ -38,6 +38,7 @@ microservice-chart:
     periodSeconds: 10
   deployment:
     create: true
+    replicas: 3
   service:
     create: true
     type: ClusterIP
@@ -91,7 +92,7 @@ microservice-chart:
     ROOT_LOGGING_LEVEL: "INFO"
     APP_LOGGING_LEVEL: "INFO"
     WEB_LOGGING_LEVEL: "INFO"
-    OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service"
+    OTEL_SERVICE_NAME: "pagopa-ecommerce-cdc-service-beta"
     OTEL_SERVICE_ENVIRONMENT: "uat"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=uat"
     OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.elastic-system.svc:4317"
@@ -129,15 +130,15 @@ microservice-chart:
     REDIS_SLAVE_CONN_MAX: "5"
     REDIS_MASTER_CONN_MIN: "2"
     REDIS_MASTER_CONN_MAX: "5"
-    CDC_REDIS_JOB_LOCK_KEYSPACE: "ecommerceCdcEventLock"
+    CDC_REDIS_JOB_LOCK_KEYSPACE: "ecommerceCdcEventLock-beta"
     CDC_REDIS_JOB_LOCK_TTL_MS: "600000"
     CDC_REDIS_JOB_LOCK_WAIT_TIME_MS: "100"
-    CDC_REDIS_RESUME_KEYSPACE: "ecommerceCdcResume"
+    CDC_REDIS_RESUME_KEYSPACE: "ecommerceCdcResume-beta"
     CDC_REDIS_RESUME_TARGET: "eventstore"
-    CDC_REDIS_RESUME_FALLBACK_IN_MIN: "60"
-    CDC_REDIS_RESUME_TTL_IN_MIN: "4320" #3 days
+    CDC_REDIS_RESUME_FALLBACK_IN_MIN: "525600" #1 year
+    CDC_REDIS_RESUME_TTL_IN_MIN: "60"
     CDC_RESUME_SAVE_INTERVAL: "5"
-    ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME: "transactions-view"
+    ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME: "transactions-view-cdc"
   envSecret:
     OTEL_EXPORTER_OTLP_HEADERS: elastic-otel-token-header
     MONGO_PASSWORD: mongo-ecommerce-password
