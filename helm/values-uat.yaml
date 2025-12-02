@@ -47,7 +47,7 @@ microservice-chart:
   ingress:
     create: true
     host: "weuuat.ecommerce.internal.uat.platform.pagopa.it"
-    path: /pagopa-ecommerce-cdc-service/(.*)
+    path: /pagopa-ecommerce-cdc-service-soak/(.*)
     servicePort: 8080
   serviceAccount:
     create: false
