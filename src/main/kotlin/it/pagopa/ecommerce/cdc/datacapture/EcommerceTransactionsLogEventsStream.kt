@@ -110,7 +110,10 @@ class EcommerceTransactionsLogEventsStream(
                                     val fullDocument = it.raw?.fullDocument
                                     val skipDocument = fullDocument?.containsKey("ttl") ?: false
                                     if (skipDocument) {
-                                        logger.info("Skip event: {}", fullDocument)
+                                        logger.info(
+                                            "Skip event with id: {}",
+                                            fullDocument.get("_id"),
+                                        )
                                     }
                                     return@filter !skipDocument
                                 }
