@@ -7,17 +7,17 @@ description = "pagopa-ecommerce-cdc-service"
 version = "1.0.2-SNAPSHOT"
 
 plugins {
-    id("java")
-    kotlin("jvm") version "2.2.0"
-    kotlin("plugin.spring") version "2.2.0"
-    id("org.springframework.boot") version "3.5.3"
-    id("io.spring.dependency-management") version "1.1.7"
-    id("org.openapi.generator") version "7.14.0"
-    id("com.diffplug.spotless") version "7.1.0"
-    id("org.sonarqube") version "6.2.0.5505"
-    id("com.dipien.semantic-version") version "2.0.0" apply false
-    jacoco
-    application
+  id("java")
+  kotlin("jvm") version "2.2.0"
+  kotlin("plugin.spring") version "2.2.0"
+  id("org.springframework.boot") version "3.5.3"
+  id("io.spring.dependency-management") version "1.1.7"
+  id("org.openapi.generator") version "7.14.0"
+  id("com.diffplug.spotless") version "7.1.0"
+  id("org.sonarqube") version "6.2.0.5505"
+  id("com.dipien.semantic-version") version "2.0.0" apply false
+  jacoco
+  application
 }
 
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
@@ -25,23 +25,23 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 configurations { compileOnly { extendsFrom(configurations.annotationProcessor.get()) } }
 
 repositories {
-    mavenCentral()
-    maven {
-        name = "GitHubPackages"
-        url = uri("https://maven.pkg.github.com/pagopa/pagopa-ecommerce-commons")
-        credentials {
-            username = "token"
-            password = System.getenv("GITHUB_TOKEN")
-        }
+  mavenCentral()
+  maven {
+    name = "GitHubPackages"
+    url = uri("https://maven.pkg.github.com/pagopa/pagopa-ecommerce-commons")
+    credentials {
+      username = "token"
+      password = System.getenv("GITHUB_TOKEN")
     }
+  }
 }
 
 dependencyLocking { lockAllConfigurations() }
 
 object Dependencies {
-    const val ECS_LOGGING_VERSION = "1.6.0"
-    const val OPEN_TELEMETRY_VERSION = "1.37.0"
-    const val MOCKITO_KOTLIN_VERSION = "5.2.1"
+  const val ECS_LOGGING_VERSION = "1.6.0"
+  const val OPEN_TELEMETRY_VERSION = "1.37.0"
+  const val MOCKITO_KOTLIN_VERSION = "5.2.1"
 }
 
 // eCommerce commons library version
@@ -51,33 +51,33 @@ val ecommerceCommonsVersion = "3.2.0"
 val ecommerceCommonsGitRef = ecommerceCommonsVersion
 
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-data-mongodb-reactive")
-    implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.boot:spring-boot-starter-webflux")
-    implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
-    implementation("co.elastic.logging:logback-ecs-encoder:${Dependencies.ECS_LOGGING_VERSION}")
-    // otel api
-    implementation("io.opentelemetry:opentelemetry-api:${Dependencies.OPEN_TELEMETRY_VERSION}")
-    // eCommerce commons library
-    implementation("it.pagopa:pagopa-ecommerce-commons:$ecommerceCommonsVersion")
-    compileOnly("org.projectlombok:lombok")
-    annotationProcessor("org.projectlombok:lombok")
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("io.projectreactor:reactor-test")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-    testImplementation("it.pagopa:pagopa-ecommerce-commons:$ecommerceCommonsVersion:tests")
-    testImplementation("org.mockito.kotlin:mockito-kotlin:${Dependencies.MOCKITO_KOTLIN_VERSION}")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+  implementation("org.springframework.boot:spring-boot-starter-data-mongodb-reactive")
+  implementation("org.springframework.boot:spring-boot-starter-actuator")
+  implementation("org.springframework.boot:spring-boot-starter-webflux")
+  implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
+  implementation("org.jetbrains.kotlin:kotlin-reflect")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
+  implementation("co.elastic.logging:logback-ecs-encoder:${Dependencies.ECS_LOGGING_VERSION}")
+  // otel api
+  implementation("io.opentelemetry:opentelemetry-api:${Dependencies.OPEN_TELEMETRY_VERSION}")
+  // eCommerce commons library
+  implementation("it.pagopa:pagopa-ecommerce-commons:$ecommerceCommonsVersion")
+  compileOnly("org.projectlombok:lombok")
+  annotationProcessor("org.projectlombok:lombok")
+  testImplementation("org.springframework.boot:spring-boot-starter-test")
+  testImplementation("io.projectreactor:reactor-test")
+  testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+  testImplementation("it.pagopa:pagopa-ecommerce-commons:$ecommerceCommonsVersion:tests")
+  testImplementation("org.mockito.kotlin:mockito-kotlin:${Dependencies.MOCKITO_KOTLIN_VERSION}")
+  testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 configurations {
-    implementation.configure {
-        exclude(module = "spring-boot-starter-web")
-        exclude("org.apache.tomcat")
-        exclude(group = "org.slf4j", module = "slf4j-simple")
-    }
+  implementation.configure {
+    exclude(module = "spring-boot-starter-web")
+    exclude("org.apache.tomcat")
+    exclude(group = "org.slf4j", module = "slf4j-simple")
+  }
 }
 
 kotlin { compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") } }
@@ -85,50 +85,50 @@ kotlin { compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") } }
 tasks.withType<Test> { useJUnitPlatform() }
 
 tasks
-    .register("applySemanticVersionPlugin") { dependsOn("prepareKotlinBuildScriptModel") }
-    .apply { apply(plugin = "com.dipien.semantic-version") }
+  .register("applySemanticVersionPlugin") { dependsOn("prepareKotlinBuildScriptModel") }
+  .apply { apply(plugin = "com.dipien.semantic-version") }
 
 configure<com.diffplug.gradle.spotless.SpotlessExtension> {
-    kotlin {
-        toggleOffOn()
-        targetExclude("build/**/*")
-        ktfmt().kotlinlangStyle()
-    }
-    kotlinGradle {
-        toggleOffOn()
-        targetExclude("build/**/*.kts")
-        ktfmt().googleStyle()
-    }
-    java {
-        target("**/*.java")
-        targetExclude("build/**/*")
-        eclipse().configFile("eclipse-style.xml")
-        toggleOffOn()
-        removeUnusedImports()
-        trimTrailingWhitespace()
-        endWithNewline()
-    }
+  kotlin {
+    toggleOffOn()
+    targetExclude("build/**/*")
+    ktfmt().kotlinlangStyle()
+  }
+  kotlinGradle {
+    toggleOffOn()
+    targetExclude("build/**/*.kts")
+    ktfmt().googleStyle()
+  }
+  java {
+    target("**/*.java")
+    targetExclude("build/**/*")
+    eclipse().configFile("eclipse-style.xml")
+    toggleOffOn()
+    removeUnusedImports()
+    trimTrailingWhitespace()
+    endWithNewline()
+  }
 }
 
 tasks.test {
-    useJUnitPlatform()
-    finalizedBy(tasks.jacocoTestReport) // report is always generated after tests run
+  useJUnitPlatform()
+  finalizedBy(tasks.jacocoTestReport) // report is always generated after tests run
 }
 
 tasks.jacocoTestReport {
-    dependsOn(tasks.test) // tests are required to run before generating the report
+  dependsOn(tasks.test) // tests are required to run before generating the report
 
-    classDirectories.setFrom(
-        files(
-            classDirectories.files.map {
-                fileTree(it).matching {
-                    exclude("it/pagopa/ecommerce/cdc/PagopaEcommerceCdcServiceApplicationKt.class")
-                }
-            }
-        )
+  classDirectories.setFrom(
+    files(
+      classDirectories.files.map {
+        fileTree(it).matching {
+          exclude("it/pagopa/ecommerce/cdc/PagopaEcommerceCdcServiceApplicationKt.class")
+        }
+      }
     )
+  )
 
-    reports { xml.required.set(true) }
+  reports { xml.required.set(true) }
 }
 
 /**
@@ -139,9 +139,9 @@ val projectName = project.name
 val projectVersion = project.version
 
 tasks.processResources {
-    filesMatching("application.properties") {
-        expand(mapOf("project.artifactId" to projectName, "project.version" to projectVersion))
-    }
+  filesMatching("application.properties") {
+    expand(mapOf("project.artifactId" to projectName, "project.version" to projectVersion))
+  }
 }
 
 // opting into the new kotlin 2.2.0 behaviour for annotations
@@ -150,5 +150,5 @@ tasks.processResources {
 val compileKotlin: KotlinCompile by tasks
 
 compileKotlin.compilerOptions {
-    freeCompilerArgs.set(listOf("-Xannotation-default-target=param-property"))
+  freeCompilerArgs.set(listOf("-Xannotation-default-target=param-property"))
 }
