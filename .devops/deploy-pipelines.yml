@@ -179,37 +179,9 @@ stages:
               instructions: "Please approve or reject UAT blue green promotions for $(commitUrl)"
               onTimeout: 'reject'
 
-  - stage: "tag_docker_release"
-    displayName: 'Tag Docker image to be release'
-    dependsOn: Get_Release_Version
-    condition:
-      and(
-      succeeded(),
-      eq(${{parameters.SKIP_BUILD}}, false)
-      )
-    variables:
-      app_version: remove-lock
-    jobs:
-      - job: "build"
-        displayName: 'Build UAT service beta'
-        steps:
-          - task: Docker@2
-            displayName: "docker login"
-            inputs:
-              containerRegistry: $(UAT_CONTAINER_REGISTRY_SERVICE_CONN)
-              command: "login"
-          - task: Bash@3
-            displayName: "docker tag new version"
-            inputs:
-              targetType: "inline"
-              script: |
-                docker pull $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(Build.SourceVersion)
-                docker tag $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(Build.SourceVersion) $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(app_version)
-                docker push $(UAT_CONTAINER_NAMESPACE)/$(K8S_IMAGE_REPOSITORY_NAME):$(app_version)
-
   - stage: "Deploy_UAT_Green"
     displayName: 'UAT green deployment'
-    dependsOn: [ tag_docker_release, Get_Release_Version ]
+    dependsOn: [ Get_Release_Version ]
     condition: |
       and(
         eq(${{parameters.UAT_PROD_DEPLOY}}, true),
