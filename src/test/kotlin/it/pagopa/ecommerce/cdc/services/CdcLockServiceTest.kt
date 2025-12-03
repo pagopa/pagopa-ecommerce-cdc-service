@@ -2,19 +2,15 @@ package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RedisJobLockPolicyConfig
 import it.pagopa.ecommerce.cdc.exceptions.CdcEventProcessingLockNotAcquiredException
-import java.util.concurrent.TimeUnit
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.junit.jupiter.MockitoExtension
-import org.mockito.kotlin.any
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.times
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
+import org.mockito.kotlin.*
 import org.redisson.api.RLockReactive
 import org.redisson.api.RedissonReactiveClient
 import reactor.core.publisher.Mono
 import reactor.test.StepVerifier
+import java.util.concurrent.TimeUnit
 
 @ExtendWith(MockitoExtension::class)
 class CdcLockServiceTest {
@@ -23,7 +19,7 @@ class CdcLockServiceTest {
     private val redisJobLockPolicyConfig: RedisJobLockPolicyConfig =
         RedisJobLockPolicyConfig("lockkeyspace", 20, 2)
     private val cdcLockService: CdcLockService =
-        CdcLockService(redissonClient, redisJobLockPolicyConfig)
+        CdcLockService()
 
     /*+ Lock tests **/
 
