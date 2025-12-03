@@ -14,8 +14,7 @@ import reactor.core.publisher.Mono
  * transaction events.
  */
 @Service
-class CdcLockService(
-) {
+class CdcLockService() {
     private val logger: Logger = LoggerFactory.getLogger(javaClass)
 
     /**
