@@ -181,7 +181,6 @@ stages:
 
   - stage: "Deploy_UAT_Green"
     displayName: 'UAT green deployment'
-    dependsOn: [ Get_Release_Version ]
     condition: |
       and(
         eq(${{parameters.UAT_PROD_DEPLOY}}, true),
