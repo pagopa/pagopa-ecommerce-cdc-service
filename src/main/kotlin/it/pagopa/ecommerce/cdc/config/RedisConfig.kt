@@ -3,6 +3,9 @@ package it.pagopa.ecommerce.cdc.config
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import it.pagopa.ecommerce.commons.redis.reactivetemplatewrappers.ReactiveExclusiveLockDocumentWrapper
+import it.pagopa.ecommerce.commons.repositories.ExclusiveLockDocument
+import java.time.Duration
 import java.time.Instant
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -50,5 +53,34 @@ class RedisConfig {
                 .build()
 
         return ReactiveRedisTemplate(reactiveRedisConnectionFactory, serializationContext)
+    }
+
+    @Bean
+    fun exclusiveLockDocumentWrapper(
+        reactiveRedisConnectionFactory: ReactiveRedisConnectionFactory
+    ): ReactiveExclusiveLockDocumentWrapper {
+        // serializer
+        val keySerializer = StringRedisSerializer()
+        val valueSerializer = Jackson2JsonRedisSerializer(ExclusiveLockDocument::class.java)
+
+        // serialization context
+        val ctx =
+            RedisSerializationContext.newSerializationContext<String, ExclusiveLockDocument>(
+                    keySerializer
+                )
+                .key(keySerializer)
+                .value(valueSerializer)
+                .hashKey(keySerializer)
+                .hashValue(valueSerializer)
+                .build()
+
+        // reactive template
+        val reactiveTemplate = ReactiveRedisTemplate(reactiveRedisConnectionFactory, ctx)
+
+        return ReactiveExclusiveLockDocumentWrapper(
+            reactiveTemplate,
+            "exclusiveLocks",
+            Duration.ofSeconds(60), // default ttl
+        )
     }
 }
