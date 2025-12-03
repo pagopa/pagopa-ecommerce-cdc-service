@@ -1,10 +1,14 @@
 package it.pagopa.ecommerce.cdc.services
 
+import it.pagopa.ecommerce.cdc.config.properties.RedisJobLockPolicyConfig
 import it.pagopa.ecommerce.cdc.exceptions.CdcEventProcessingLockNotAcquiredException
+import it.pagopa.ecommerce.commons.redis.reactivetemplatewrappers.ReactiveExclusiveLockDocumentWrapper
+import it.pagopa.ecommerce.commons.repositories.ExclusiveLockDocument
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
+import java.time.Duration
 
 /**
  * Service responsible for managing distributed locking mechanisms for CDC event processing.
@@ -14,8 +18,12 @@ import reactor.core.publisher.Mono
  * transaction events.
  */
 @Service
-class CdcLockService() {
+class CdcLockService(
+    private val reactiveExclusiveLockDocumentWrapper: ReactiveExclusiveLockDocumentWrapper,
+    private val redisJobLockPolicyConfig: RedisJobLockPolicyConfig,
+) {
     private val logger: Logger = LoggerFactory.getLogger(javaClass)
+
 
     /**
      * Attempts to acquire a distributed lock for processing a specific transaction event.
@@ -32,6 +40,13 @@ class CdcLockService() {
      */
     fun acquireEventLock(eventId: String): Mono<Boolean> {
         logger.debug("Trying to acquire lock for event: {}", eventId)
-        return Mono.just(true)
+        return reactiveExclusiveLockDocumentWrapper.saveIfAbsent(
+            ExclusiveLockDocument(
+                redisJobLockPolicyConfig.getLockNameByEventId(eventId),
+                "pagopa-ecommerce-cdc-service"
+            ),
+            Duration.ofMillis(redisJobLockPolicyConfig.ttlInMs)
+        ).onErrorMap { CdcEventProcessingLockNotAcquiredException(eventId, it) }
     }
+
 }
