@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import it.pagopa.ecommerce.commons.redis.reactivetemplatewrappers.ReactiveExclusiveLockDocumentWrapper
 import it.pagopa.ecommerce.commons.repositories.ExclusiveLockDocument
+import java.time.Duration
+import java.time.Instant
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory
@@ -12,8 +14,6 @@ import org.springframework.data.redis.core.ReactiveRedisTemplate
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer
 import org.springframework.data.redis.serializer.RedisSerializationContext
 import org.springframework.data.redis.serializer.StringRedisSerializer
-import java.time.Duration
-import java.time.Instant
 
 /**
  * Redis configuration for the CDC service.
@@ -47,8 +47,8 @@ class RedisConfig {
             Jackson2JsonRedisSerializer(mapper, Instant::class.java)
         val serializationContext =
             RedisSerializationContext.newSerializationContext<String, Instant>(
-                StringRedisSerializer()
-            )
+                    StringRedisSerializer()
+                )
                 .value(jacksonRedisSerializer)
                 .build()
 
@@ -57,33 +57,30 @@ class RedisConfig {
 
     @Bean
     fun exclusiveLockDocumentWrapper(
-        reactiveRedisConnectionFactory: ReactiveRedisConnectionFactory,
+        reactiveRedisConnectionFactory: ReactiveRedisConnectionFactory
     ): ReactiveExclusiveLockDocumentWrapper {
         // serializer
         val keySerializer = StringRedisSerializer()
-        val valueSerializer = Jackson2JsonRedisSerializer(
-            ExclusiveLockDocument::class.java
-        )
+        val valueSerializer = Jackson2JsonRedisSerializer(ExclusiveLockDocument::class.java)
 
         // serialization context
-        val ctx = RedisSerializationContext
-            .newSerializationContext<String, ExclusiveLockDocument>(keySerializer)
-            .key(keySerializer)
-            .value(valueSerializer)
-            .hashKey(keySerializer)
-            .hashValue(valueSerializer)
-            .build()
+        val ctx =
+            RedisSerializationContext.newSerializationContext<String, ExclusiveLockDocument>(
+                    keySerializer
+                )
+                .key(keySerializer)
+                .value(valueSerializer)
+                .hashKey(keySerializer)
+                .hashValue(valueSerializer)
+                .build()
 
         // reactive template
-        val reactiveTemplate = ReactiveRedisTemplate(
-            reactiveRedisConnectionFactory,
-            ctx
-        )
+        val reactiveTemplate = ReactiveRedisTemplate(reactiveRedisConnectionFactory, ctx)
 
         return ReactiveExclusiveLockDocumentWrapper(
             reactiveTemplate,
             "exclusiveLocks",
-            Duration.ofSeconds(60) //default ttl
+            Duration.ofSeconds(60), // default ttl
         )
     }
 }
