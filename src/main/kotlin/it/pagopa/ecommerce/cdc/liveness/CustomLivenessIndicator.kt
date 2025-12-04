@@ -44,11 +44,8 @@ class CustomLivenessIndicator(
             logger.error("CDC stream not alive detected.")
             return LivenessState.BROKEN
         }
-        val inactivityTimeout = Duration.ofMillis(inactivityTimeoutSeconds)
-        if (
-            Duration.between(lastDequeuedEventAt, Instant.now()).abs() >
-                Duration.ofSeconds(inactivityTimeoutSeconds)
-        ) {
+        val inactivityTimeout = Duration.ofSeconds(inactivityTimeoutSeconds)
+        if (Duration.between(lastDequeuedEventAt, Instant.now()).abs() > inactivityTimeout) {
             logger.error(
                 "CDC inactivity detected. Last dequeued event at: [{}], inactivity timeout: [{}]",
                 lastDequeuedEventAt,
