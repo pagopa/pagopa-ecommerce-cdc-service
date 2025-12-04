@@ -3,13 +3,11 @@ package it.pagopa.ecommerce.cdc.datacapture
 import com.mongodb.MongoException
 import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
 import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
+import it.pagopa.ecommerce.cdc.liveness.CustomLivenessIndicator
 import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
-import java.time.Duration
-import java.time.Instant
-import java.time.ZonedDateTime
 import kotlinx.coroutines.reactor.mono
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -24,6 +22,9 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import reactor.util.retry.Retry
+import java.time.Duration
+import java.time.Instant
+import java.time.ZonedDateTime
 
 /** Main CDC component that listens to MongoDB Change Streams for transaction events. */
 @Component
@@ -47,14 +48,17 @@ class EcommerceTransactionsLogEventsStream(
         streamEcommerceTransactionsLogEvents()
             .doOnSubscribe {
                 logger.info("CDC service is now running and waiting for change stream events...")
+                CustomLivenessIndicator.cdcStreamUpAndRunning.set(true)
             }
             .doOnError { error ->
                 logger.error("A critical error occurred in the change stream pipeline", error)
+                CustomLivenessIndicator.cdcStreamUpAndRunning.set(false)
             }
             .doOnComplete {
                 logger.warn(
                     "Transaction change stream completed. The service might stop processing new events."
                 )
+                CustomLivenessIndicator.cdcStreamUpAndRunning.set(false)
             }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe()
@@ -67,46 +71,47 @@ class EcommerceTransactionsLogEventsStream(
     fun streamEcommerceTransactionsLogEvents(): Flux<TransactionEvent<*>> {
         val flux: Flux<TransactionEvent<*>> =
             Flux.defer {
-                    logger.info(
-                        "Connecting to MongoDB Change Stream for collection: ${changeStreamOptionsConfig.collection}"
-                    )
-                    redisResumePolicyService
-                        .getResumeTimestamp()
-                        .flatMapMany { resumeTimestamp ->
-                            reactiveMongoTemplate
-                                .changeStream(
-                                    changeStreamOptionsConfig.collection,
-                                    ChangeStreamOptions.builder()
-                                        .filter(
-                                            Aggregation.newAggregation(
-                                                Aggregation.match(
-                                                    Criteria.where("operationType")
-                                                        .`in`(
-                                                            changeStreamOptionsConfig.operationType
-                                                        )
-                                                ),
-                                                Aggregation.project(
-                                                    changeStreamOptionsConfig.project
-                                                ),
-                                            )
+                logger.info(
+                    "Connecting to MongoDB Change Stream for collection: ${changeStreamOptionsConfig.collection}"
+                )
+                redisResumePolicyService
+                    .getResumeTimestamp()
+                    .flatMapMany { resumeTimestamp ->
+                        reactiveMongoTemplate
+                            .changeStream(
+                                changeStreamOptionsConfig.collection,
+                                ChangeStreamOptions.builder()
+                                    .filter(
+                                        Aggregation.newAggregation(
+                                            Aggregation.match(
+                                                Criteria.where("operationType")
+                                                    .`in`(
+                                                        changeStreamOptionsConfig.operationType
+                                                    )
+                                            ),
+                                            Aggregation.project(
+                                                changeStreamOptionsConfig.project
+                                            ),
                                         )
-                                        .resumeAt(resumeTimestamp)
-                                        .build(),
-                                    TransactionEvent::class.java,
-                                )
-                                .filter {
-                                    /*
-                                       @formatter:off
-                                       events are immutable, once written they are never update by eCommerce application
-                                       except for the data migration process that set TTL at document level.
-                                       this update is seen as an update operation and this is the reason for this filter as per CDC listening operations
-                                       list this cannot be set to insert only as it produce an error at CDC configuration level
-                                       see here https://learn.microsoft.com/en-us/answers/questions/356668/how-to-get-inserted-change-stream-data-use-cosmosd
-                                       unfortunately the operationType returned by CosmosDB driver is null, so no filter can be done on operationType field.
-                                       For this reason an applicative filter have been applied here to exclude all those document that have ttl field set:
-                                       eCommerce services does not set ttl field explicitly saving event to event store so when a detected changed document
-                                       contains TTL field valued it can be skipped
-                                    */
+                                    )
+                                    .resumeAt(resumeTimestamp)
+                                    .build(),
+                                TransactionEvent::class.java,
+                            )
+                            .doOnNext { CustomLivenessIndicator.lastDequeuedEventAt = Instant.now() }
+                            .filter {
+                                /*
+                                   @formatter:off
+                                   events are immutable, once written they are never update by eCommerce application
+                                   except for the data migration process that set TTL at document level.
+                                   this update is seen as an update operation and this is the reason for this filter as per CDC listening operations
+                                   list this cannot be set to insert only as it produce an error at CDC configuration level
+                                   see here https://learn.microsoft.com/en-us/answers/questions/356668/how-to-get-inserted-change-stream-data-use-cosmosd
+                                   unfortunately the operationType returned by CosmosDB driver is null, so no filter can be done on operationType field.
+                                   For this reason an applicative filter have been applied here to exclude all those document that have ttl field set:
+                                   eCommerce services does not set ttl field explicitly saving event to event store so when a detected changed document
+                                   contains TTL field valued it can be skipped
+                                */
                                     val fullDocument = it.raw?.fullDocument
                                     val skipDocument = fullDocument?.containsKey("ttl") ?: false
                                     if (skipDocument) {
