@@ -41,7 +41,7 @@ class CustomLivenessIndicator(
 
         // app state is correct, checking CDC parameters
         if (!cdcStreamUpAndRunning.get()) {
-            logger.error("App is not alive, detected CDC stream to not be alive")
+            logger.error("CDC stream not alive detected.")
             return LivenessState.BROKEN
         }
         val inactivityTimeout = Duration.ofMillis(inactivityTimeoutSeconds)
