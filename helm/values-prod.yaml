@@ -132,6 +132,7 @@ microservice-chart:
     CDC_REDIS_RESUME_TTL_IN_MIN: "4320" #3 days
     CDC_RESUME_SAVE_INTERVAL: "5"
     ECOMMERCE_TRANSACTION_VIEW_COLLECTION_NAME: "transactions-view"
+    CUSTOM_LIVENESS_INDICATOR_CDC_INACTIVITY_THRESHOLD_SECONDS: 3600 #1h
   envSecret:
     OTEL_EXPORTER_OTLP_HEADERS: elastic-otel-token-header
     MONGO_PASSWORD: mongo-ecommerce-password
