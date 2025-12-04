@@ -360,7 +360,9 @@ class EcommerceTransactionsLogEventsStreamTest {
         given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
         given(ecommerceCDCEventDispatcherService.dispatchEvent(any())).willAnswer {
-            Mono.just(it.arguments[0])
+            Mono.just(
+                it.arguments[0]
+            ) // pagopa-s-weu-ec.kb.westeurope.azure.elastic-cloud.com/app/apm/services/pagopa-ecommerce-cdc-service/metrics?comparisonEnabled=true&environment=ENVIRONMENT_ALL&kuery=&latencyAggregationType=avg&offset=1d&rangeFrom=now-15m&rangeTo=now&serviceGroup=&transactionType=request
         }
 
         given(redisResumePolicyService.saveResumeTimestamp(any())).willReturn(Mono.just(true))
