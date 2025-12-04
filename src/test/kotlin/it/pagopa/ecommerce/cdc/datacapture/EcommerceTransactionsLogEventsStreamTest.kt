@@ -197,7 +197,10 @@ class EcommerceTransactionsLogEventsStreamTest {
                     eq(TransactionEvent::class.java),
                 )
             )
-            .willReturn(Flux.just(changeStreamEvent1, changeStreamEvent2))
+            .willReturn(
+                Flux.just(changeStreamEvent1, changeStreamEvent2)
+                    .delayElements(Duration.ofMillis(500))
+            )
 
         given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
@@ -208,7 +211,7 @@ class EcommerceTransactionsLogEventsStreamTest {
 
         val result = ecommerceTransactionsLogEventsStream.streamEcommerceTransactionsLogEvents()
 
-        StepVerifier.create(result).expectNext(event1).expectNext(event2).verifyComplete()
+        StepVerifier.create(result).expectNext(event1, event2).verifyComplete()
 
         verify(cdcLockService, times(2)).acquireEventLock(any())
         verify(ecommerceCDCEventDispatcherService).dispatchEvent(event1)
