@@ -3,6 +3,7 @@ package it.pagopa.ecommerce.cdc.datacapture
 import com.mongodb.MongoException
 import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
 import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
+import it.pagopa.ecommerce.cdc.liveness.CustomLivenessIndicator
 import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
@@ -47,14 +48,17 @@ class EcommerceTransactionsLogEventsStream(
         streamEcommerceTransactionsLogEvents()
             .doOnSubscribe {
                 logger.info("CDC service is now running and waiting for change stream events...")
+                CustomLivenessIndicator.cdcStreamUpAndRunning.set(true)
             }
             .doOnError { error ->
                 logger.error("A critical error occurred in the change stream pipeline", error)
+                CustomLivenessIndicator.cdcStreamUpAndRunning.set(false)
             }
             .doOnComplete {
                 logger.warn(
                     "Transaction change stream completed. The service might stop processing new events."
                 )
+                CustomLivenessIndicator.cdcStreamUpAndRunning.set(false)
             }
             .subscribeOn(Schedulers.boundedElastic())
             .subscribe()
@@ -94,6 +98,9 @@ class EcommerceTransactionsLogEventsStream(
                                         .build(),
                                     TransactionEvent::class.java,
                                 )
+                                .doOnNext {
+                                    CustomLivenessIndicator.lastDequeuedEventAt = Instant.now()
+                                }
                                 .filter {
                                     /*
                                        @formatter:off
