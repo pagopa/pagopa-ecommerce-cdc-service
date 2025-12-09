@@ -53,6 +53,20 @@ class CustomLivenessIndicatorTest {
     }
 
     @Test
+    fun `Should skip inactive CDC detected status for negative inactivity timeout parameter (no event processed inside threshold)`() {
+        // pre-condition
+        val customLivenessIndicator = CustomLivenessIndicator(applicationAvailability, -1L)
+        given(applicationAvailability.livenessState).willReturn(LivenessState.CORRECT)
+        CustomLivenessIndicator.cdcStreamUpAndRunning.set(true)
+        CustomLivenessIndicator.lastDequeuedEventAt =
+            Instant.now() - Duration.ofSeconds(inactivityTimeoutSeconds + 1)
+        // test
+        val state = customLivenessIndicator.getState(applicationAvailability)
+        // assertions
+        assertEquals(LivenessState.CORRECT, state)
+    }
+
+    @Test
     fun `Should return correct status for for healthy app`() {
         // pre-condition
         given(applicationAvailability.livenessState).willReturn(LivenessState.CORRECT)
