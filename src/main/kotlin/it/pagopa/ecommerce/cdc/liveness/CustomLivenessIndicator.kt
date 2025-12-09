@@ -45,7 +45,10 @@ class CustomLivenessIndicator(
             return LivenessState.BROKEN
         }
         val inactivityTimeout = Duration.ofSeconds(inactivityTimeoutSeconds)
-        if (Duration.between(lastDequeuedEventAt, Instant.now()).abs() > inactivityTimeout) {
+        if (
+            inactivityTimeout.isPositive &&
+                Duration.between(lastDequeuedEventAt, Instant.now()).abs() > inactivityTimeout
+        ) {
             logger.error(
                 "CDC inactivity detected. Last dequeued event at: [{}], inactivity timeout: [{}]",
                 lastDequeuedEventAt,
