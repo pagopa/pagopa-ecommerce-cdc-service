@@ -281,6 +281,7 @@ class TransactionViewUpsertService(
                 is TransactionAuthorizationCompletedEvent -> updateAuthCompletedData(event)
                 is TransactionUserReceiptRequestedEvent -> updateUserReceiptData(event)
                 is TransactionClosedEvent -> updateClosedData(event)
+                is TransactionClosureSyntheticEvent -> updateClosureSyntheticData(event)
                 is TransactionClosureErrorEvent -> updateClosureErrorData(event)
                 is TransactionClosureRetriedEvent -> updateClosureRetriedData(event)
                 is TransactionExpiredEvent -> updateExpiredData(event)
@@ -502,6 +503,19 @@ class TransactionViewUpsertService(
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
 
+        return Pair(null, statusUpdate)
+    }
+
+    /**
+     * Updates fields for TRANSACTION_CLOSURE_SYNTHETIC_EVENT. Sets sendPaymentResultOutcome, unsets closureErrorData.
+     */
+    private fun updateClosureSyntheticData(event: TransactionClosureSyntheticEvent): Pair<Update?, Update> {
+        val statusUpdate = Update()
+        statusUpdate["sendPaymentResultOutcome"] = TransactionUserReceiptData.Outcome.NOT_RECEIVED
+        statusUpdate["status"] = TransactionStatusDto.CLOSED
+        statusUpdate.unset("closureErrorData")
+        statusUpdate["lastProcessedEventAt"] =
+            ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
         return Pair(null, statusUpdate)
     }
 
