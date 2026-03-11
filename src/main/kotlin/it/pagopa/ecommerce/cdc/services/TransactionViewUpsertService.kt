@@ -509,9 +509,12 @@ class TransactionViewUpsertService(
     }
 
     /**
-     * Updates fields for TRANSACTION_CLOSURE_SYNTHETIC_EVENT. Sets sendPaymentResultOutcome, unsets closureErrorData.
+     * Updates fields for TRANSACTION_CLOSURE_SYNTHETIC_EVENT. Sets sendPaymentResultOutcome, unsets
+     * closureErrorData.
      */
-    private fun updateClosureSyntheticData(event: TransactionClosureSyntheticEvent): Pair<Update?, Update> {
+    private fun updateClosureSyntheticData(
+        event: TransactionClosureSyntheticEvent
+    ): Pair<Update?, Update> {
         val update = Update()
         val statusUpdate = Update()
         update.unset("closureErrorData")

@@ -1429,13 +1429,13 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
         given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
@@ -1443,15 +1443,16 @@ class TransactionViewUpsertServiceTest {
         }
 
         given(
-            mongoTemplate.upsert(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        ).willAnswer {
-            mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
-        }
+            .willAnswer {
+                mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
+            }
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1538,19 +1539,18 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
         given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
             mono { UpdateResult.acknowledged(1L, 1L, null) }
         }
-
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
@@ -1619,13 +1619,13 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
         given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
@@ -2150,7 +2150,7 @@ class TransactionViewUpsertServiceTest {
             .upsert(eq(queryByTransactionAndLastProcessedEventAtCondition), any(), any(), any())
     }
 
-    //Closure synthetic
+    // Closure synthetic
     @Test
     fun `should perform upsert operation gathering data from transaction closure synthetic data when transaction view exists with lastProcessedEventAt timestamp before event creationDate`() {
         // pre-conditions
@@ -2171,13 +2171,13 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(1L, 1L, null) } }
 
         // test
@@ -2232,13 +2232,13 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
         given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
@@ -2246,13 +2246,13 @@ class TransactionViewUpsertServiceTest {
         }
 
         given(
-            mongoTemplate.upsert(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.upsert(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer {
                 mono { UpdateResult.acknowledged(0L, 0L, BsonString(event.transactionId)) }
             }
@@ -2340,19 +2340,18 @@ class TransactionViewUpsertServiceTest {
             )
 
         given(
-            mongoTemplate.updateFirst(
-                eq(queryByTransactionAndLastProcessedEventAtCondition),
-                any(),
-                any(),
-                any(),
+                mongoTemplate.updateFirst(
+                    eq(queryByTransactionAndLastProcessedEventAtCondition),
+                    any(),
+                    any(),
+                    any(),
+                )
             )
-        )
             .willAnswer { mono { UpdateResult.acknowledged(0L, 0L, null) } }
 
         given(mongoTemplate.updateFirst(eq(queryByTransactionId), any(), any(), any())).willAnswer {
             mono { UpdateResult.acknowledged(1L, 1L, null) }
         }
-
 
         // test
         StepVerifier.create(transactionViewUpsertService.upsertEventData(event))
