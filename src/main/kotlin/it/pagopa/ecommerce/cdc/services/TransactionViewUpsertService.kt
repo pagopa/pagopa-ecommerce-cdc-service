@@ -281,6 +281,7 @@ class TransactionViewUpsertService(
                 is TransactionAuthorizationCompletedEvent -> updateAuthCompletedData(event)
                 is TransactionUserReceiptRequestedEvent -> updateUserReceiptData(event)
                 is TransactionClosedEvent -> updateClosedData(event)
+                is TransactionClosureSyntheticEvent -> updateClosureSyntheticData(event)
                 is TransactionClosureErrorEvent -> updateClosureErrorData(event)
                 is TransactionClosureRetriedEvent -> updateClosureRetriedData(event)
                 is TransactionExpiredEvent -> updateExpiredData(event)
@@ -486,7 +487,9 @@ class TransactionViewUpsertService(
      * timestamp.
      */
     private fun updateClosedData(event: TransactionClosedEvent): Pair<Update?, Update> {
+        val update = Update()
         val statusUpdate = Update()
+        update.unset("closureErrorData")
         statusUpdate["sendPaymentResultOutcome"] = TransactionUserReceiptData.Outcome.NOT_RECEIVED
         statusUpdate.unset("closureErrorData")
         statusUpdate["status"] =
@@ -502,7 +505,25 @@ class TransactionViewUpsertService(
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
 
-        return Pair(null, statusUpdate)
+        return Pair(update, statusUpdate)
+    }
+
+    /**
+     * Updates fields for TRANSACTION_CLOSURE_SYNTHETIC_EVENT. Sets sendPaymentResultOutcome, unsets
+     * closureErrorData.
+     */
+    private fun updateClosureSyntheticData(
+        event: TransactionClosureSyntheticEvent
+    ): Pair<Update?, Update> {
+        val update = Update()
+        val statusUpdate = Update()
+        update.unset("closureErrorData")
+        statusUpdate["sendPaymentResultOutcome"] = TransactionUserReceiptData.Outcome.NOT_RECEIVED
+        statusUpdate["status"] = TransactionStatusDto.CLOSED
+        statusUpdate.unset("closureErrorData")
+        statusUpdate["lastProcessedEventAt"] =
+            ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
+        return Pair(update, statusUpdate)
     }
 
     /** Updates fields for TRANSACTION_USER_CANCELED_EVENT. Adds cancellation timestamp. */
