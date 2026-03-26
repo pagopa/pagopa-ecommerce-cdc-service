@@ -277,7 +277,7 @@ class TransactionViewUpsertService(
         val result: Pair<Update?, Update> =
             when (event) {
                 is TransactionActivatedEvent -> updateActivationData(event)
-                //is TransactionAuthorizationRequestedEvent -> updateAuthRequestData(event)
+                // is TransactionAuthorizationRequestedEvent -> updateAuthRequestData(event)
                 is TransactionAuthorizationCompletedEvent -> updateAuthCompletedData(event)
                 is TransactionUserReceiptRequestedEvent -> updateUserReceiptData(event)
                 is TransactionClosedEvent -> updateClosedData(event)
