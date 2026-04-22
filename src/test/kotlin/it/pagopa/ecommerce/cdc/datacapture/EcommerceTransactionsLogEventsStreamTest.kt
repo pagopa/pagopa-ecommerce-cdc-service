@@ -358,14 +358,14 @@ class EcommerceTransactionsLogEventsStreamTest {
                     eq(TransactionEvent::class.java),
                 )
             )
-            .willReturn(Flux.fromIterable(changeStreamEvents))
+            // test assume that events are processed sequentially that is not always the case
+            // add a delay here to make events being processed sequentially
+            .willReturn(Flux.fromIterable(changeStreamEvents).delayElements(Duration.ofMillis(200)))
 
         given(cdcLockService.acquireEventLock(any())).willReturn(Mono.just(true))
 
         given(ecommerceCDCEventDispatcherService.dispatchEvent(any())).willAnswer {
-            Mono.just(
-                it.arguments[0]
-            ) // pagopa-s-weu-ec.kb.westeurope.azure.elastic-cloud.com/app/apm/services/pagopa-ecommerce-cdc-service/metrics?comparisonEnabled=true&environment=ENVIRONMENT_ALL&kuery=&latencyAggregationType=avg&offset=1d&rangeFrom=now-15m&rangeTo=now&serviceGroup=&transactionType=request
+            Mono.just(it.arguments[0])
         }
 
         given(redisResumePolicyService.saveResumeTimestamp(any())).willReturn(Mono.just(true))
@@ -378,7 +378,12 @@ class EcommerceTransactionsLogEventsStreamTest {
         // (0-based indexing: 9 = 10th element, 19 = 20th element)
         // Since we only have 12 elements, only position 9 should trigger save
         verify(redisResumePolicyService, times(1))
-            .saveResumeTimestamp(ZonedDateTime.parse(events[9].creationDate).toInstant())
+            .saveResumeTimestamp(
+                argThat { timestamp ->
+                    assertEquals(ZonedDateTime.parse(events[9].creationDate).toInstant(), timestamp)
+                    true
+                }
+            )
     }
 
     @Test
