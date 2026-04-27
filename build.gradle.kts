@@ -40,7 +40,7 @@ dependencyLocking { lockAllConfigurations() }
 
 object Dependencies {
   const val ECS_LOGGING_VERSION = "1.6.0"
-  const val OPEN_TELEMETRY_VERSION = "1.37.0"
+  const val OPEN_TELEMETRY_VERSION = "1.60.0"
   const val MOCKITO_KOTLIN_VERSION = "5.2.1"
 }
 
