@@ -89,6 +89,7 @@ microservice-chart:
       maxSurge: 2
       maxUnavailable: 0
   envConfig:
+    ACTIVE_PROFILE: k8s
     ROOT_LOGGING_LEVEL: "INFO"
     APP_LOGGING_LEVEL: "INFO"
     WEB_LOGGING_LEVEL: "INFO"
