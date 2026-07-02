@@ -8,6 +8,7 @@ import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication
+import reactor.core.publisher.Hooks
 
 @SpringBootApplication
 @EnableConfigurationProperties(
@@ -20,5 +21,7 @@ import org.springframework.boot.runApplication
 class PagopaEcommerceCdcServiceApplication
 
 fun main(args: Array<String>) {
+    // Enable Reactor automatic context propagation (used to bridge contextual data to logging MDC).
+    Hooks.enableAutomaticContextPropagation()
     runApplication<PagopaEcommerceCdcServiceApplication>(*args)
 }
