@@ -35,21 +35,7 @@ class EcommerceCDCEventDispatcherService(
      * @return Mono<TransactionEvent<*>> The processed transaction event
      */
     fun dispatchEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> =
-        Mono.defer {
-                // extract document fields
-                val transactionId = event.transactionId
-                val eventClass = event.javaClass
-                val creationDate = event.creationDate
-
-                logger.info(
-                    "Handling new change stream event: transactionId: [{}], eventType: [{}], creationDate: [{}]",
-                    transactionId,
-                    eventClass,
-                    creationDate,
-                )
-
-                processTransactionEvent(event)
-            }
+        Mono.defer { processTransactionEvent(event) }
             .retryWhen(
                 Retry.fixedDelay(
                         retrySendPolicyConfig.maxAttempts,
@@ -86,36 +72,11 @@ class EcommerceCDCEventDispatcherService(
      * @return Mono<TransactionEvent<*>> The processed transaction event
      */
     private fun processTransactionEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> {
-        val eventId = event.id
-        val transactionId = event.transactionId
-        val eventCode = event.eventCode
-        val creationDate = event.creationDate
-
-        logger.info(
-            "CDC Event Details: transactionId: [{}], eventId: [{}], eventCode: [{}], creationDate: [{}]",
-            transactionId,
-            eventId,
-            eventCode,
-            creationDate,
-        )
 
         return transactionViewUpsertService
             .upsertEventData(event)
-            .doOnSuccess {
-                logger.debug(
-                    "Successfully upserted transaction view for eventId: [{}], transactionId: [{}]",
-                    eventId,
-                    transactionId,
-                )
-            }
-            .doOnError { error ->
-                logger.error(
-                    "Failed to upsert transaction view for eventId: [{}], transactionId: [{}]",
-                    eventId,
-                    transactionId,
-                    error,
-                )
-            }
+            .doOnSuccess { logger.info("Successfully upserted transaction view") }
+            .doOnError { error -> logger.error("Failed to upsert transaction view", error) }
             .doFinally { signalType ->
                 val outcome = if (signalType == SignalType.ON_ERROR) "ERROR" else "OK"
                 viewUpdateTracingUtils.addSpanForProcessedEvent(event, outcome)

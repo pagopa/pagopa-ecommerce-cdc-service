@@ -138,7 +138,16 @@ class EcommerceTransactionsLogEventsStream(
                                 }
                         }
                         // Process the elements of the Flux
-                        .flatMap { processEvent(it) }
+                        .flatMap { currentEvent ->
+                            processEvent(currentEvent).contextWrite { context ->
+                                context
+                                    .put(
+                                        "ctx.transaction.id",
+                                        currentEvent.transactionId ?: "UNKNOWN",
+                                    )
+                                    .put("event.action", "PROCESS_CDC_EVENT")
+                            }
+                        }
                         // Save resume token every n emitted elements
                         .index { changeEventFluxIndex, changeEventDocument ->
                             Pair(changeEventFluxIndex, changeEventDocument)
@@ -146,6 +155,7 @@ class EcommerceTransactionsLogEventsStream(
                         .flatMap { (changeEventFluxIndex, changeEventDocument) ->
                             saveCdcResumeToken(changeEventFluxIndex, changeEventDocument)
                         }
+                        .contextCapture()
                         .doOnError { logger.error("Error listening to change stream: ", it) }
                 }
                 .retryWhen(
