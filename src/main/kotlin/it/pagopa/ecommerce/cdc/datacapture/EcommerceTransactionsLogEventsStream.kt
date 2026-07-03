@@ -4,7 +4,7 @@ import com.mongodb.MongoException
 import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
 import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
 import it.pagopa.ecommerce.cdc.liveness.CustomLivenessIndicator
-import it.pagopa.ecommerce.cdc.mdcutilities.TransactionTracingUtils
+import it.pagopa.ecommerce.cdc.mdcutilities.CdcTracingUtils
 import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
@@ -43,14 +43,8 @@ class EcommerceTransactionsLogEventsStream(
 
     override fun onApplicationEvent(event: ApplicationReadyEvent) {
 
-        logger.info(
-            "Starting transaction change stream consumer for collection: ${changeStreamOptionsConfig.collection}"
-        )
         streamEcommerceTransactionsLogEvents()
-            .doOnSubscribe {
-                logger.info("CDC service is now running and waiting for change stream events...")
-                CustomLivenessIndicator.cdcStreamUpAndRunning.set(true)
-            }
+            .doOnSubscribe { CustomLivenessIndicator.cdcStreamUpAndRunning.set(true) }
             .doOnError { error ->
                 logger.error("A critical error occurred in the change stream pipeline", error)
                 CustomLivenessIndicator.cdcStreamUpAndRunning.set(false)
@@ -72,9 +66,6 @@ class EcommerceTransactionsLogEventsStream(
     fun streamEcommerceTransactionsLogEvents(): Flux<TransactionEvent<*>> {
         val flux: Flux<TransactionEvent<*>> =
             Flux.defer {
-                    logger.info(
-                        "Connecting to MongoDB Change Stream for collection: ${changeStreamOptionsConfig.collection}"
-                    )
                     redisResumePolicyService
                         .getResumeTimestamp()
                         .flatMapMany { resumeTimestamp ->
@@ -141,10 +132,7 @@ class EcommerceTransactionsLogEventsStream(
                         // Process the elements of the Flux
                         .flatMap { currentEvent ->
                             processEvent(currentEvent).contextWrite { context ->
-                                TransactionTracingUtils.enrichContextForCdcEvent(
-                                    currentEvent,
-                                    context,
-                                )
+                                CdcTracingUtils.enrichContextForCdcEvent(currentEvent, context)
                             }
                         }
                         // Save resume token every n emitted elements
@@ -162,8 +150,8 @@ class EcommerceTransactionsLogEventsStream(
                             Duration.ofMillis(retryStreamPolicyConfig.intervalInMs),
                         )
                         .filter { t -> t is MongoException }
-                        .doBeforeRetry { signal ->
-                            logger.warn("Retrying connection to DB: ${signal.failure().message}")
+                        .doAfterRetry { signal ->
+                            logger.warn("Connection restored to DB: ${signal.failure().message}")
                         }
                 )
                 .doOnError { e ->

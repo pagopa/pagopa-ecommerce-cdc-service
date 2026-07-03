@@ -48,19 +48,14 @@ class EcommerceCDCEventDispatcherService(
                             true
                         }
                     }
-                    .doBeforeRetry { signal ->
+                    .doAfterRetry { signal ->
                         logger.warn(
-                            "Retrying event processing for event with id: [${event.id}], transaction id: [${event.transactionId}] for error during process, attempt: [${signal.totalRetries()}/${retrySendPolicyConfig.maxAttempts}]",
+                            "Retried event processing after an error during process, attempt: [${signal.totalRetries()}/${retrySendPolicyConfig.maxAttempts}]",
                             signal.failure(),
                         )
                     }
             )
-            .doOnError { e ->
-                logger.error(
-                    "Error processing event with id: [${event.id}], transaction id: [${event.transactionId}]",
-                    e,
-                )
-            }
+            .doOnError { e -> logger.error("Error processing event", e) }
             .map { event }
 
     /**

@@ -15,9 +15,9 @@ import reactor.util.context.Context;
  * Helper that copies selected values from Reactor Context to MDC for each
  * signal.
  */
-public class MDCContextLifter<T> implements CoreSubscriber<T> {
+class MDCContextLifter<T> implements CoreSubscriber<T> {
 
-    private final CoreSubscriber<T> coreSubscriber;
+    CoreSubscriber<T> coreSubscriber;
 
     public MDCContextLifter(CoreSubscriber<T> coreSubscriber) {
         this.coreSubscriber = coreSubscriber;
@@ -62,7 +62,7 @@ public class MDCContextLifter<T> implements CoreSubscriber<T> {
         if (!context.isEmpty()) {
             Map<String, String> mdcContextMap = Optional.ofNullable(MDC.getCopyOfContextMap()).orElseGet(HashMap::new);
             Map<String, String> reactorContextMap = Arrays
-                    .stream(TransactionTracingUtils.TracingEntry.values())
+                    .stream(CdcTracingUtils.TracingEntry.values())
                     .map(
                             key -> new AbstractMap.SimpleEntry<>(
                                     key.getKey(),

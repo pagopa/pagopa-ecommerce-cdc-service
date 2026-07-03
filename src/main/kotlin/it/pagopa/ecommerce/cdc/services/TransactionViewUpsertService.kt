@@ -11,6 +11,7 @@ import it.pagopa.ecommerce.commons.generated.server.model.TransactionStatusDto
 import java.time.ZonedDateTime
 import kotlinx.coroutines.reactor.mono
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
@@ -57,25 +58,15 @@ class TransactionViewUpsertService(
      * @return Mono<UpdateResult> The result of the update/upsert operation
      */
     fun upsertEventData(event: TransactionEvent<*>): Mono<UpdateResult> {
-        val eventCode = event.eventCode
-        val transactionId = event.transactionId
 
-        logger.debug(
-            "Upserting transaction view data for _id: [{}], eventCode: [{}]",
-            transactionId,
-            eventCode,
-        )
+        logger.debug("Upserting transaction view data")
 
         return buildUpdateFromEvent(event)
             .flatMap { (dataUpdate, statusUpdate) ->
                 tryToUpdateExistingView(event, statusUpdate, dataUpdate)
                     .flatMap { updateResult ->
                         if (updateResult.modifiedCount == 0L) {
-                            logger.warn(
-                                "No document updated for transactionId: [{}] processing event with id: [{}], trying upsert",
-                                event.transactionId,
-                                event.id,
-                            )
+                            logger.warn("No document updated")
                             upsertTransaction(
                                     event,
                                     statusUpdate.set(
@@ -119,14 +110,21 @@ class TransactionViewUpsertService(
                     }
             }
             .doOnNext { updateResult ->
-                logger.debug(
-                    "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
-                    transactionId,
-                    eventCode,
-                    updateResult.matchedCount,
-                    updateResult.modifiedCount,
-                    updateResult.upsertedId != null,
-                )
+                MDC.put("ctx.details.matched", "${updateResult.matchedCount}")
+                MDC.put("ctx.details.modified", "${updateResult.modifiedCount}")
+                MDC.put("ctx.details.upserted", "${updateResult.upsertedId != null}")
+                try {
+                    logger.debug(
+                        "Upsert completed  - matched: {}, modified: {}, upserted: {}",
+                        updateResult.matchedCount,
+                        updateResult.modifiedCount,
+                        updateResult.upsertedId != null,
+                    )
+                } finally {
+                    MDC.remove("ctx.details.matched")
+                    MDC.remove("ctx.details.modified")
+                    MDC.remove("ctx.details.upserted")
+                }
             }
     }
 
@@ -297,11 +295,7 @@ class TransactionViewUpsertService(
                 is TransactionUserReceiptAddRetriedEvent -> updateUserReceiptRetryData(event)
 
                 else -> {
-                    logger.warn(
-                        "Unhandled event with code: [{}]. Event class: [{}]",
-                        eventCode,
-                        event.javaClass,
-                    )
+                    logger.warn("Unhandled event. Event class: [{}]", event.javaClass)
                     return Mono.error {
                         CdcEventTypeException(
                             "Cannot handle event with eventCode: $eventCode Event class: ${event.javaClass}"
