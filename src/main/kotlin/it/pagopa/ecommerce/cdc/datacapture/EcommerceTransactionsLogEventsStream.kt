@@ -4,6 +4,7 @@ import com.mongodb.MongoException
 import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
 import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
 import it.pagopa.ecommerce.cdc.liveness.CustomLivenessIndicator
+import it.pagopa.ecommerce.cdc.mdcutilities.TransactionTracingUtils
 import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
@@ -140,13 +141,10 @@ class EcommerceTransactionsLogEventsStream(
                         // Process the elements of the Flux
                         .flatMap { currentEvent ->
                             processEvent(currentEvent).contextWrite { context ->
-                                context
-                                    .put(
-                                        "ctx.transaction.id",
-                                        currentEvent.transactionId ?: "UNKNOWN",
-                                    )
-                                    .put("ctx.event.code", currentEvent.eventCode ?: "UNKNOWN")
-                                    .put("event.action", "PROCESS_CDC_EVENT")
+                                TransactionTracingUtils.enrichContextForCdcEvent(
+                                    currentEvent,
+                                    context,
+                                )
                             }
                         }
                         // Save resume token every n emitted elements
@@ -156,7 +154,6 @@ class EcommerceTransactionsLogEventsStream(
                         .flatMap { (changeEventFluxIndex, changeEventDocument) ->
                             saveCdcResumeToken(changeEventFluxIndex, changeEventDocument)
                         }
-                        .contextCapture()
                         .doOnError { logger.error("Error listening to change stream: ", it) }
                 }
                 .retryWhen(

@@ -6,6 +6,7 @@
             <serviceName>${OTEL_SERVICE_NAME:-undefined}</serviceName>
             <serviceVersion>${ECS_SERVICE_VERSION}</serviceVersion>
             <serviceEnvironment>${OTEL_RESOURCE_ATTRIBUTES_DEPLOYMENT_ENVIRONMENT:-undefined}</serviceEnvironment>
+            <includeMdc>true</includeMdc>
         </encoder>
     </appender>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
