@@ -154,8 +154,7 @@ class EcommerceTransactionsLogEventsStream(
                             logger.warn("Connection restored to DB: ${signal.failure().message}")
                         }
                 )
-                .doOnError { logger.error("Failed to connect to DB after retries")
-                }
+                .doOnError { logger.error("Failed to connect to DB after retries") }
 
         return flux
     }
