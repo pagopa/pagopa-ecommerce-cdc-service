@@ -45,8 +45,8 @@ class EcommerceTransactionsLogEventsStream(
 
         streamEcommerceTransactionsLogEvents()
             .doOnSubscribe { CustomLivenessIndicator.cdcStreamUpAndRunning.set(true) }
-            .doOnError { error ->
-                logger.error("A critical error occurred in the change stream pipeline", error)
+            .doOnError {
+                logger.error("A critical error occurred in the change stream pipeline")
                 CustomLivenessIndicator.cdcStreamUpAndRunning.set(false)
             }
             .doOnComplete {
@@ -142,7 +142,7 @@ class EcommerceTransactionsLogEventsStream(
                         .flatMap { (changeEventFluxIndex, changeEventDocument) ->
                             saveCdcResumeToken(changeEventFluxIndex, changeEventDocument)
                         }
-                        .doOnError { logger.error("Error listening to change stream: ", it) }
+                        .doOnError { logger.error("Error listening to change stream") }
                 }
                 .retryWhen(
                     Retry.fixedDelay(
@@ -154,8 +154,7 @@ class EcommerceTransactionsLogEventsStream(
                             logger.warn("Connection restored to DB: ${signal.failure().message}")
                         }
                 )
-                .doOnError { e ->
-                    logger.error("Failed to connect to DB after retries {}", e.message)
+                .doOnError { logger.error("Failed to connect to DB after retries")
                 }
 
         return flux
@@ -175,7 +174,7 @@ class EcommerceTransactionsLogEventsStream(
                 } ?: Mono.empty()
             }
             .onErrorResume {
-                logger.error("Error during event handling: ", it)
+                logger.error("Error during event handling")
                 Mono.empty()
             }
     }
@@ -202,7 +201,7 @@ class EcommerceTransactionsLogEventsStream(
             }
             .subscribeOn(Schedulers.boundedElastic())
             .onErrorResume {
-                logger.error("Error saving resume policy: ", it)
+                logger.error("Error saving resume policy")
                 Mono.empty()
             }
 }

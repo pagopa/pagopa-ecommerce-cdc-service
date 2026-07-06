@@ -55,7 +55,7 @@ class EcommerceCDCEventDispatcherService(
                         )
                     }
             )
-            .doOnError { e -> logger.error("Error processing event", e) }
+            .doOnError { logger.error("Error processing event") }
             .map { event }
 
     /**
@@ -71,7 +71,7 @@ class EcommerceCDCEventDispatcherService(
         return transactionViewUpsertService
             .upsertEventData(event)
             .doOnSuccess { logger.info("Successfully upserted transaction view") }
-            .doOnError { error -> logger.error("Failed to upsert transaction view", error) }
+            .doOnError { logger.error("Failed to upsert transaction view") }
             .doFinally { signalType ->
                 val outcome = if (signalType == SignalType.ON_ERROR) "ERROR" else "OK"
                 viewUpdateTracingUtils.addSpanForProcessedEvent(event, outcome)
