@@ -1,6 +1,7 @@
 package it.pagopa.ecommerce.cdc.mdcutilities;
 
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent;
+import org.slf4j.MDC;
 import reactor.util.context.Context;
 
 /**
@@ -17,7 +18,9 @@ public class CdcTracingUtils {
         CTX_TRANSACTION_ID("ctx.transaction.id", "{transactionId-not-found}"),
         CTX_EVENT_CODE("ctx.event.code", "{eventCode-not-found}"),
         CTX_EVENT_ID("ctx.event.id", "{eventId-not-found}"),
-        EVENT_ACTION("event.action", "{eventAction-not-found}");
+        EVENT_ACTION("event.action", "{eventAction-not-found}"),
+        ERROR_TYPE("error.type", "{errorType-not-found}"),
+        ERROR_MESSAGE("error.message", "{errorMessage-not-found}");
 
         private final String key;
         private final String defaultValue;
@@ -64,5 +67,29 @@ public class CdcTracingUtils {
                                 : TracingEntry.CTX_EVENT_ID.getDefaultValue()
                 )
                 .put(TracingEntry.EVENT_ACTION.getKey(), "PROCESS_CDC_EVENT");
+    }
+
+    /**
+     * Put error.type and error.message into MDC without logging the stack trace.
+     */
+    public static void putErrorInMdc(Throwable error) {
+        MDC.put(
+                TracingEntry.ERROR_TYPE.getKey(),
+                error != null
+                        ? error.getClass().getName()
+                        : TracingEntry.ERROR_TYPE.getDefaultValue()
+        );
+        MDC.put(
+                TracingEntry.ERROR_MESSAGE.getKey(),
+                error != null && error.getMessage() != null
+                        ? error.getMessage()
+                        : TracingEntry.ERROR_MESSAGE.getDefaultValue()
+        );
+    }
+
+    /** Remove error.type and error.message from MDC. */
+    public static void clearErrorFromMdc() {
+        MDC.remove(TracingEntry.ERROR_TYPE.getKey());
+        MDC.remove(TracingEntry.ERROR_MESSAGE.getKey());
     }
 }
