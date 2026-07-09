@@ -2,7 +2,6 @@ package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
 import it.pagopa.ecommerce.cdc.exceptions.CdcException
-import it.pagopa.ecommerce.cdc.mdcutilities.CdcTracingUtils
 import it.pagopa.ecommerce.cdc.utils.ViewUpdateTracingUtils
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
@@ -56,14 +55,7 @@ class EcommerceCDCEventDispatcherService(
                         )
                     }
             )
-            .doOnError { error ->
-                CdcTracingUtils.putErrorInMdc(error)
-                try {
-                    logger.error("Error processing event")
-                } finally {
-                    CdcTracingUtils.clearErrorFromMdc()
-                }
-            }
+            .doOnError { e -> logger.error("Error processing event", e) }
             .map { event }
 
     /**
@@ -79,14 +71,7 @@ class EcommerceCDCEventDispatcherService(
         return transactionViewUpsertService
             .upsertEventData(event)
             .doOnSuccess { logger.info("Successfully upserted transaction view") }
-            .doOnError { error ->
-                CdcTracingUtils.putErrorInMdc(error)
-                try {
-                    logger.error("Failed to upsert transaction view")
-                } finally {
-                    CdcTracingUtils.clearErrorFromMdc()
-                }
-            }
+            .doOnError { error -> logger.error("Failed to upsert transaction view", error) }
             .doFinally { signalType ->
                 val outcome = if (signalType == SignalType.ON_ERROR) "ERROR" else "OK"
                 viewUpdateTracingUtils.addSpanForProcessedEvent(event, outcome)
