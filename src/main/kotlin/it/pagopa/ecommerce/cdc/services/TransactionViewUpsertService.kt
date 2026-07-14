@@ -3,6 +3,7 @@ package it.pagopa.ecommerce.cdc.services
 import com.mongodb.client.result.UpdateResult
 import it.pagopa.ecommerce.cdc.exceptions.CdcEventTypeException
 import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
+import it.pagopa.ecommerce.cdc.mdcutilities.CdcTracingUtils
 import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import it.pagopa.ecommerce.commons.documents.v2.*
 import it.pagopa.ecommerce.commons.documents.v2.authorization.NpgTransactionGatewayAuthorizationData
@@ -11,7 +12,6 @@ import it.pagopa.ecommerce.commons.generated.server.model.TransactionStatusDto
 import java.time.ZonedDateTime
 import kotlinx.coroutines.reactor.mono
 import org.slf4j.LoggerFactory
-import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
@@ -110,20 +110,19 @@ class TransactionViewUpsertService(
                     }
             }
             .doOnNext { updateResult ->
-                MDC.put("ctx.details.matched", "${updateResult.matchedCount}")
-                MDC.put("ctx.details.modified", "${updateResult.modifiedCount}")
-                MDC.put("ctx.details.upserted", "${updateResult.upsertedId != null}")
-                try {
+                CdcTracingUtils.withContextDetailsMdc(
+                    mapOf(
+                        "matched" to updateResult.matchedCount,
+                        "modified" to updateResult.modifiedCount,
+                        "upserted" to (updateResult.upsertedId != null),
+                    )
+                ) {
                     logger.debug(
                         "Upsert completed  - matched: {}, modified: {}, upserted: {}",
                         updateResult.matchedCount,
                         updateResult.modifiedCount,
                         updateResult.upsertedId != null,
                     )
-                } finally {
-                    MDC.remove("ctx.details.matched")
-                    MDC.remove("ctx.details.modified")
-                    MDC.remove("ctx.details.upserted")
                 }
             }
     }

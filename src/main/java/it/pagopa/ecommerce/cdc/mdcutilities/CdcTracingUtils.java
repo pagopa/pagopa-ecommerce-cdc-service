@@ -1,6 +1,9 @@
 package it.pagopa.ecommerce.cdc.mdcutilities;
 
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import org.slf4j.MDC;
 import reactor.util.context.Context;
 
@@ -9,6 +12,8 @@ import reactor.util.context.Context;
  * processing.
  */
 public class CdcTracingUtils {
+
+    private static final String CTX_DETAILS_PREFIX = "ctx.details.";
 
     private CdcTracingUtils() {
     }
@@ -89,5 +94,36 @@ public class CdcTracingUtils {
     public static void clearErrorFromMdc() {
         MDC.remove(TracingEntry.ERROR_TYPE.getKey());
         MDC.remove(TracingEntry.ERROR_MESSAGE.getKey());
+    }
+
+    /**
+     * Put/remove MDC entries with {@code ctx.details.*} prefix for the execution of
+     * a block.
+     */
+    public static void withContextDetailsMdc(
+                                             Map<String, ?> details,
+                                             Runnable block
+    ) {
+        List<String> detailKeys = new ArrayList<>();
+        if (details != null) {
+            details.forEach(
+                    (
+                     key,
+                     value
+                    ) -> {
+                        if (key != null && value != null) {
+                            String mdcKey = CTX_DETAILS_PREFIX + key;
+                            MDC.put(mdcKey, value.toString());
+                            detailKeys.add(mdcKey);
+                        }
+                    }
+            );
+        }
+
+        try {
+            block.run();
+        } finally {
+            detailKeys.forEach(MDC::remove);
+        }
     }
 }
