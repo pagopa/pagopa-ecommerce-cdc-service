@@ -1,5 +1,7 @@
 package it.pagopa.ecommerce.cdc.mdcutilities;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +15,8 @@ import reactor.util.context.Context;
  */
 public class CdcTracingUtils {
 
-    private static final String CTX_DETAILS_PREFIX = "ctx.details.";
+    private static final String CTX_DETAILS_KEY = "ctx.details";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private CdcTracingUtils() {
     }
@@ -74,47 +77,92 @@ public class CdcTracingUtils {
                 .put(TracingEntry.EVENT_ACTION.getKey(), "PROCESS_CDC_EVENT");
     }
 
-    /** Put structured error details in MDC without serializing stack traces. */
-    public static void putErrorInMdc(Throwable error) {
-        MDC.put(
-                TracingEntry.ERROR_TYPE.getKey(),
-                error != null
-                        ? error.getClass().getName()
-                        : TracingEntry.ERROR_TYPE.getDefaultValue()
+    /**
+     * Executes a block with structured error details temporarily inserted in MDC.
+     *
+     * <p>
+     * The method adds {@code error.type} and {@code error.message} keys, executes
+     * the provided block, and always removes those keys afterward.
+     *
+     * @param error error instance used to populate MDC metadata
+     * @param block code to execute while error metadata is available in MDC
+     */
+    public static void withErrorMdc(
+                                    Throwable error,
+                                    Runnable block
+    ) {
+        insertIntoMdcAndCleanup(
+                Map.of(
+                        TracingEntry.ERROR_TYPE.getKey(),
+                        error != null
+                                ? error.getClass().getName()
+                                : TracingEntry.ERROR_TYPE.getDefaultValue(),
+                        TracingEntry.ERROR_MESSAGE.getKey(),
+                        error != null && error.getMessage() != null
+                                ? error.getMessage()
+                                : TracingEntry.ERROR_MESSAGE.getDefaultValue()
+                ),
+                block
         );
-        MDC.put(
-                TracingEntry.ERROR_MESSAGE.getKey(),
-                error != null && error.getMessage() != null
-                        ? error.getMessage()
-                        : TracingEntry.ERROR_MESSAGE.getDefaultValue()
-        );
-    }
-
-    /** Cleanup structured error details from MDC. */
-    public static void clearErrorFromMdc() {
-        MDC.remove(TracingEntry.ERROR_TYPE.getKey());
-        MDC.remove(TracingEntry.ERROR_MESSAGE.getKey());
     }
 
     /**
-     * Put/remove MDC entries with {@code ctx.details.*} prefix for the execution of
-     * a block.
+     * Executes a block with {@code ctx.details} temporarily stored in MDC as a JSON
+     * string.
+     *
+     * <p>
+     * The input map is serialized to raw JSON and stored under key
+     * {@code ctx.details}. If serialization fails, an empty JSON object
+     * ({@code {}}) is used as fallback. The key is always removed after block
+     * execution.
+     *
+     * @param details map of detail values to serialize under {@code ctx.details}
+     * @param block   code to execute while {@code ctx.details} is available in MDC
      */
     public static void withContextDetailsMdc(
                                              Map<String, ?> details,
                                              Runnable block
     ) {
-        List<String> detailKeys = new ArrayList<>();
+        String rawDetails = "{}";
         if (details != null) {
-            details.forEach(
+            try {
+                rawDetails = OBJECT_MAPPER.writeValueAsString(details);
+            } catch (JsonProcessingException ignored) {
+                rawDetails = "{}";
+            }
+        }
+
+        insertIntoMdcAndCleanup(
+                Map.of(CTX_DETAILS_KEY, rawDetails),
+                block
+        );
+    }
+
+    /**
+     * Inserts the provided entries into MDC, executes the given block, and always
+     * removes the inserted keys afterward.
+     *
+     * <p>
+     * This method guarantees MDC cleanup through a {@code finally} block, so
+     * temporary values do not leak across log statements or threads.
+     *
+     * @param entries key/value pairs to temporarily add to MDC
+     * @param block   code to execute while MDC entries are available
+     */
+    private static void insertIntoMdcAndCleanup(
+                                                Map<String, ?> entries,
+                                                Runnable block
+    ) {
+        List<String> detailKeys = new ArrayList<>();
+        if (entries != null) {
+            entries.forEach(
                     (
                      key,
                      value
                     ) -> {
                         if (key != null && value != null) {
-                            String mdcKey = CTX_DETAILS_PREFIX + key;
-                            MDC.put(mdcKey, value.toString());
-                            detailKeys.add(mdcKey);
+                            MDC.put(key, value.toString());
+                            detailKeys.add(key);
                         }
                     }
             );

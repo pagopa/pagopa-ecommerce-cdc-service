@@ -46,11 +46,8 @@ class EcommerceTransactionsLogEventsStream(
         streamEcommerceTransactionsLogEvents()
             .doOnSubscribe { CustomLivenessIndicator.cdcStreamUpAndRunning.set(true) }
             .doOnError { error ->
-                CdcTracingUtils.putErrorInMdc(error)
-                try {
+                CdcTracingUtils.withErrorMdc(error) {
                     logger.error("A critical error occurred in the change stream pipeline")
-                } finally {
-                    CdcTracingUtils.clearErrorFromMdc()
                 }
                 CustomLivenessIndicator.cdcStreamUpAndRunning.set(false)
             }
@@ -148,11 +145,8 @@ class EcommerceTransactionsLogEventsStream(
                             saveCdcResumeToken(changeEventFluxIndex, changeEventDocument)
                         }
                         .doOnError { error ->
-                            CdcTracingUtils.putErrorInMdc(error)
-                            try {
+                            CdcTracingUtils.withErrorMdc(error) {
                                 logger.error("Error listening to change stream")
-                            } finally {
-                                CdcTracingUtils.clearErrorFromMdc()
                             }
                         }
                 }
@@ -167,11 +161,8 @@ class EcommerceTransactionsLogEventsStream(
                         }
                 )
                 .doOnError { error ->
-                    CdcTracingUtils.putErrorInMdc(error)
-                    try {
+                    CdcTracingUtils.withErrorMdc(error) {
                         logger.error("Failed to connect to DB after retries")
-                    } finally {
-                        CdcTracingUtils.clearErrorFromMdc()
                     }
                 }
 
@@ -192,12 +183,7 @@ class EcommerceTransactionsLogEventsStream(
                 } ?: Mono.empty()
             }
             .onErrorResume { error ->
-                CdcTracingUtils.putErrorInMdc(error)
-                try {
-                    logger.error("Error during event handling")
-                } finally {
-                    CdcTracingUtils.clearErrorFromMdc()
-                }
+                CdcTracingUtils.withErrorMdc(error) { logger.error("Error during event handling") }
                 Mono.empty()
             }
     }
@@ -224,12 +210,7 @@ class EcommerceTransactionsLogEventsStream(
             }
             .subscribeOn(Schedulers.boundedElastic())
             .onErrorResume { error ->
-                CdcTracingUtils.putErrorInMdc(error)
-                try {
-                    logger.error("Error saving resume policy")
-                } finally {
-                    CdcTracingUtils.clearErrorFromMdc()
-                }
+                CdcTracingUtils.withErrorMdc(error) { logger.error("Error saving resume policy") }
                 Mono.empty()
             }
 }

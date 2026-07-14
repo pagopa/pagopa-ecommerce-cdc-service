@@ -57,12 +57,7 @@ class EcommerceCDCEventDispatcherService(
                     }
             )
             .doOnError { error ->
-                CdcTracingUtils.putErrorInMdc(error)
-                try {
-                    logger.error("Error processing event")
-                } finally {
-                    CdcTracingUtils.clearErrorFromMdc()
-                }
+                CdcTracingUtils.withErrorMdc(error) { logger.error("Error processing event") }
             }
             .map { event }
 
@@ -80,11 +75,8 @@ class EcommerceCDCEventDispatcherService(
             .upsertEventData(event)
             .doOnSuccess { logger.info("Successfully upserted transaction view") }
             .doOnError { error ->
-                CdcTracingUtils.putErrorInMdc(error)
-                try {
+                CdcTracingUtils.withErrorMdc(error) {
                     logger.error("Failed to upsert transaction view")
-                } finally {
-                    CdcTracingUtils.clearErrorFromMdc()
                 }
             }
             .doFinally { signalType ->
