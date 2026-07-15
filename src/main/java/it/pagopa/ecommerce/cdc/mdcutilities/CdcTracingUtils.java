@@ -172,6 +172,8 @@ public class CdcTracingUtils {
             block.run();
         } finally {
             detailKeys.forEach(MDC::remove);
+            MDC.remove(TracingEntry.ERROR_TYPE.getKey());
+            MDC.remove(TracingEntry.ERROR_MESSAGE.getKey());
         }
     }
 }

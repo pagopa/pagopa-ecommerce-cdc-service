@@ -117,12 +117,7 @@ class TransactionViewUpsertService(
                         "upserted" to (updateResult.upsertedId != null),
                     )
                 ) {
-                    logger.debug(
-                        "Upsert completed  - matched: {}, modified: {}, upserted: {}",
-                        updateResult.matchedCount,
-                        updateResult.modifiedCount,
-                        updateResult.upsertedId != null,
-                    )
+                    logger.debug("Upsert completed")
                 }
             }
     }
@@ -294,7 +289,11 @@ class TransactionViewUpsertService(
                 is TransactionUserReceiptAddRetriedEvent -> updateUserReceiptRetryData(event)
 
                 else -> {
-                    logger.warn("Unhandled event. Event class: [{}]", event.javaClass)
+                    CdcTracingUtils.withContextDetailsMdc(
+                        mapOf("eventClass" to event.javaClass.toString())
+                    ) {
+                        logger.warn("Unhandled event")
+                    }
                     return Mono.error {
                         CdcEventTypeException(
                             "Cannot handle event with eventCode: $eventCode Event class: ${event.javaClass}"
@@ -417,10 +416,11 @@ class TransactionViewUpsertService(
             }
 
             else ->
-                logger.warn(
-                    "Unhandled transaction gateway authorization data: [{}]",
-                    gatewayAuthData::class.java,
-                )
+                CdcTracingUtils.withContextDetailsMdc(
+                    mapOf("gatewayAuthorizationDataClass" to gatewayAuthData::class.java.toString())
+                ) {
+                    logger.warn("Unhandled transaction gateway authorization data")
+                }
         }
 
         statusUpdate["status"] = TransactionStatusDto.AUTHORIZATION_COMPLETED

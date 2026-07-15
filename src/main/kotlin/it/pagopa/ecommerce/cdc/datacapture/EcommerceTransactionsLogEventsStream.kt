@@ -110,23 +110,19 @@ class EcommerceTransactionsLogEventsStream(
                                     */
                                     val fullDocument = it.raw?.fullDocument
                                     val skipDocument = fullDocument?.containsKey("ttl") ?: false
-                                    if (skipDocument) {
-                                        logger.info(
-                                            "Skip event with id: {}",
-                                            fullDocument.get("_id"),
-                                        )
-                                    }
                                     return@filter !skipDocument
                                 }
                                 .flatMap {
                                     mono { it.body }
-                                        .onErrorResume { exception ->
-                                            logger.warn(
-                                                "Exception converting document to POJO, skipping document: [${
-                                                it.raw?.fullDocument.toString()
-                                            }]",
-                                                exception,
-                                            )
+                                        .onErrorResume { _ ->
+                                            CdcTracingUtils.withContextDetailsMdc(
+                                                mapOf(
+                                                    "rawFullDocument" to
+                                                        it.raw?.fullDocument.toString()
+                                                )
+                                            ) {
+                                                logger.warn("Exception converting document to POJO")
+                                            }
                                             Mono.empty()
                                         }
                                 }
@@ -157,7 +153,11 @@ class EcommerceTransactionsLogEventsStream(
                         )
                         .filter { t -> t is MongoException }
                         .doAfterRetry { signal ->
-                            logger.warn("Connection restored to DB: ${signal.failure().message}")
+                            CdcTracingUtils.withContextDetailsMdc(
+                                mapOf("retryFailureMessage" to signal.failure().message)
+                            ) {
+                                logger.warn("Connection restored to DB")
+                            }
                         }
                 )
                 .doOnError { error ->
