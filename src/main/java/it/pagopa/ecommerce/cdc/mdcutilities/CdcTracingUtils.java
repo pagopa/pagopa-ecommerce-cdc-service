@@ -21,24 +21,34 @@ public class CdcTracingUtils {
     private CdcTracingUtils() {
     }
 
-    /** Tracing keys copied from Reactor Context to MDC. */
+    /**
+     * Tracing keys used in MDC and/or propagated from Reactor Context.
+     *
+     * <p>
+     * Entries marked as {@code contextBound = true} are copied from Reactor Context
+     * to MDC by {@link MDCContextLifter}. Entries marked as {@code false} are
+     * written locally in MDC (for example by {@link #withErrorMdc}).
+     */
     public enum TracingEntry {
-        CTX_TRANSACTION_ID("ctx.transaction.id", "{transactionId-not-found}"),
-        CTX_EVENT_CODE("ctx.event.code", "{eventCode-not-found}"),
-        CTX_EVENT_ID("ctx.event.id", "{eventId-not-found}"),
-        EVENT_ACTION("event.action", "{eventAction-not-found}"),
-        ERROR_TYPE("error.type", "{errorType-not-found}"),
-        ERROR_MESSAGE("error.message", "{errorMessage-not-found}");
+        CTX_TRANSACTION_ID("ctx.transaction.id", "{transactionId-not-found}", true),
+        CTX_EVENT_CODE("ctx.event.code", "{eventCode-not-found}", true),
+        CTX_EVENT_ID("ctx.event.id", "{eventId-not-found}", true),
+        EVENT_ACTION("event.action", "{eventAction-not-found}", true),
+        ERROR_TYPE("error.type", "{errorType-not-found}", false),
+        ERROR_MESSAGE("error.message", "{errorMessage-not-found}", false);
 
         private final String key;
         private final String defaultValue;
+        private final boolean contextBound;
 
         TracingEntry(
                 String key,
-                String defaultValue
+                String defaultValue,
+                boolean contextBound
         ) {
             this.key = key;
             this.defaultValue = defaultValue;
+            this.contextBound = contextBound;
         }
 
         public String getKey() {
@@ -47,6 +57,10 @@ public class CdcTracingUtils {
 
         public String getDefaultValue() {
             return defaultValue;
+        }
+
+        public boolean isContextBound() {
+            return contextBound;
         }
     }
 
@@ -172,8 +186,6 @@ public class CdcTracingUtils {
             block.run();
         } finally {
             detailKeys.forEach(MDC::remove);
-            MDC.remove(TracingEntry.ERROR_TYPE.getKey());
-            MDC.remove(TracingEntry.ERROR_MESSAGE.getKey());
         }
     }
 }
