@@ -190,9 +190,7 @@ class EcommerceTransactionsLogEventsStream(
                 } ?: Mono.empty()
             }
             .onErrorResume { error ->
-                CdcTracingUtils.withErrorMdc(error) {
-                    logger.error("Error during event handling")
-                }
+                CdcTracingUtils.withErrorMdc(error) { logger.error("Error during event handling") }
                 Mono.empty()
             }
     }
