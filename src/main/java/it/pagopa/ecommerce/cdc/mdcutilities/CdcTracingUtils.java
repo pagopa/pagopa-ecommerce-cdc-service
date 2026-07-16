@@ -6,6 +6,8 @@ import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import reactor.util.context.Context;
 
@@ -17,6 +19,7 @@ public class CdcTracingUtils {
 
     private static final String CTX_DETAILS_KEY = "ctx.details";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Logger LOGGER = LoggerFactory.getLogger(CdcTracingUtils.class);
 
     private CdcTracingUtils() {
     }
@@ -175,8 +178,12 @@ public class CdcTracingUtils {
                      value
                     ) -> {
                         if (key != null && value != null) {
-                            MDC.put(key, value.toString());
-                            detailKeys.add(key);
+                            try {
+                                MDC.put(key, value.toString());
+                                detailKeys.add(key);
+                            } catch (RuntimeException e) {
+                                LOGGER.warn("Cannot insert MDC entry for key [{}]", key, e);
+                            }
                         }
                     }
             );

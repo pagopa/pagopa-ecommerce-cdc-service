@@ -289,11 +289,6 @@ class TransactionViewUpsertService(
                 is TransactionUserReceiptAddRetriedEvent -> updateUserReceiptRetryData(event)
 
                 else -> {
-                    CdcTracingUtils.withContextDetailsMdc(
-                        mapOf("eventClass" to event.javaClass.toString())
-                    ) {
-                        logger.warn("Unhandled event")
-                    }
                     return Mono.error {
                         CdcEventTypeException(
                             "Cannot handle event with eventCode: $eventCode Event class: ${event.javaClass}"

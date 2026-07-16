@@ -110,6 +110,13 @@ class EcommerceTransactionsLogEventsStream(
                                     */
                                     val fullDocument = it.raw?.fullDocument
                                     val skipDocument = fullDocument?.containsKey("ttl") ?: false
+                                    if (skipDocument) {
+                                        CdcTracingUtils.withContextDetailsMdc(
+                                            mapOf("skippedEventId" to fullDocument.get("_id"))
+                                        ) {
+                                            logger.info("Skipped event")
+                                        }
+                                    }
                                     return@filter !skipDocument
                                 }
                                 .flatMap {
@@ -183,7 +190,9 @@ class EcommerceTransactionsLogEventsStream(
                 } ?: Mono.empty()
             }
             .onErrorResume { error ->
-                CdcTracingUtils.withErrorMdc(error) { logger.error("Error during event handling") }
+                CdcTracingUtils.withErrorMdc(error) {
+                    logger.error("Error during event handling")
+                }
                 Mono.empty()
             }
     }
