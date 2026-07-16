@@ -51,10 +51,12 @@ class EcommerceCDCEventDispatcherService(
                     }
                     .doAfterRetry { signal ->
                         val retryAttempt = signal.totalRetries()
+                        val signalFailureMessage = signal.failure().message
                         CdcTracingUtils.withContextDetailsMdc(
                             mapOf(
                                 "retryAttempt" to retryAttempt,
                                 "maxRetryAttempts" to retrySendPolicyConfig.maxAttempts,
+                                "signalFailureMessage" to signalFailureMessage,
                             )
                         ) {
                             logger.warn("Retried event processing after an error during process")
