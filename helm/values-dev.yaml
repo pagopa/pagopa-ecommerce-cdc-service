@@ -38,7 +38,6 @@ microservice-chart:
     periodSeconds: 10
   deployment:
     create: true
-    replicas: 2 #TODO remove
   service:
     create: true
     type: ClusterIP
