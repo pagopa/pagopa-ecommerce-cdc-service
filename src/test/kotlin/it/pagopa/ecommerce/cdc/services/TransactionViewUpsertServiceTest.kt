@@ -4,6 +4,7 @@ import com.mongodb.client.result.UpdateResult
 import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
 import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import it.pagopa.ecommerce.commons.documents.v2.*
+import it.pagopa.ecommerce.commons.documents.v2.authorization.NpgTransactionGatewayAuthorizationData
 import it.pagopa.ecommerce.commons.documents.v2.authorization.RedirectTransactionGatewayAuthorizationData
 import it.pagopa.ecommerce.commons.generated.npg.v1.dto.OperationResultDto
 import it.pagopa.ecommerce.commons.generated.server.model.TransactionStatusDto
@@ -674,6 +675,10 @@ class TransactionViewUpsertServiceTest {
                     assertEquals(event.data.paymentTypeCode, setDocument["paymentTypeCode"])
                     assertEquals(event.data.pspId, setDocument["pspId"])
                     assertEquals(event.data.fee, setDocument["feeTotal"])
+                    assertEquals(
+                        event.data.authorizationRequestId,
+                        setDocument["authorizationRequestId"],
+                    )
                     true
                 },
                 eq(BaseTransactionView::class.java),
@@ -707,6 +712,7 @@ class TransactionViewUpsertServiceTest {
                     )
             )
 
+        val gatewayAuthData = event.data.transactionGatewayAuthorizationData
         given(
                 mongoTemplate.updateFirst(
                     eq(queryByTransactionAndLastProcessedEventAtCondition),
@@ -751,7 +757,12 @@ class TransactionViewUpsertServiceTest {
                             setDocument["authorizationErrorCode"],
                         )
                     } else {
-                        kotlin.test.assertNull(setDocument["authorizationErrorCode"])
+                        assertNull(setDocument["authorizationErrorCode"])
+                    }
+                    if (gatewayAuthData is NpgTransactionGatewayAuthorizationData) {
+                        assertEquals(gatewayAuthData.paymentEndToEndId, setDocument["endToEndId"])
+                    } else {
+                        assertNull(setDocument["endToEndId"])
                     }
                     true
                 },
@@ -2765,6 +2776,7 @@ class TransactionViewUpsertServiceTest {
                 TransactionStatusDto.ACTIVATED -> TransactionStatusDto.EXPIRED_NOT_AUTHORIZED
                 TransactionStatusDto.CANCELLATION_REQUESTED ->
                     TransactionStatusDto.CANCELLATION_EXPIRED
+
                 else -> TransactionStatusDto.EXPIRED
             }
         val queryByTransactionId =
