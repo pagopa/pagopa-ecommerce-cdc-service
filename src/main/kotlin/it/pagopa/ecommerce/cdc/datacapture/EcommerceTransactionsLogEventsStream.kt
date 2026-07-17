@@ -186,7 +186,7 @@ class EcommerceTransactionsLogEventsStream(
                     cdcLockService
                         .acquireEventLock(event.id)
                         .filter { it == true }
-                        .doOnSuccess {
+                        .doOnNext {
                             CdcTracingUtils.withContextDetailsMdc(
                                 mapOf(
                                     CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-redis"
