@@ -342,12 +342,14 @@ class TransactionViewUpsertService(
         update["paymentTypeCode"] = authorizationRequestedData.paymentTypeCode
         update["pspId"] = authorizationRequestedData.pspId
         update["feeTotal"] = authorizationRequestedData.fee
+        update["authorizationRequestId"] = authorizationRequestedData.authorizationRequestId
 
         statusUpdate["paymentGateway"] = authorizationRequestedData.paymentGateway
         statusUpdate["paymentTypeCode"] = authorizationRequestedData.paymentTypeCode
         statusUpdate["pspId"] = authorizationRequestedData.pspId
         statusUpdate["feeTotal"] = authorizationRequestedData.fee
         statusUpdate["status"] = TransactionStatusDto.AUTHORIZATION_REQUESTED
+        statusUpdate["authorizationRequestId"] = authorizationRequestedData.authorizationRequestId
         statusUpdate["lastProcessedEventAt"] =
             ZonedDateTime.parse(event.creationDate).toInstant().toEpochMilli()
 
@@ -385,9 +387,12 @@ class TransactionViewUpsertService(
 
         when (gatewayAuthData) {
             is NpgTransactionGatewayAuthorizationData -> {
-                update["gatewayAuthorizationStatus"] = gatewayAuthData.operationResult.toString()
-
+                update["gatewayAuthorizationStatus"] = gatewayAuthData.operationResult
                 statusUpdate["gatewayAuthorizationStatus"] = gatewayAuthData.operationResult
+                if (gatewayAuthData.paymentEndToEndId != null) {
+                    update["endToEndId"] = gatewayAuthData.paymentEndToEndId
+                    statusUpdate["endToEndId"] = gatewayAuthData.paymentEndToEndId
+                }
                 if (gatewayAuthData.errorCode != null) {
                     update["authorizationErrorCode"] = gatewayAuthData.errorCode
                     statusUpdate["authorizationErrorCode"] = gatewayAuthData.errorCode
@@ -398,8 +403,7 @@ class TransactionViewUpsertService(
             }
 
             is RedirectTransactionGatewayAuthorizationData -> {
-                update["gatewayAuthorizationStatus"] = gatewayAuthData.outcome.toString()
-
+                update["gatewayAuthorizationStatus"] = gatewayAuthData.outcome
                 statusUpdate["gatewayAuthorizationStatus"] = gatewayAuthData.outcome
 
                 if (gatewayAuthData.errorCode != null) {
@@ -452,6 +456,7 @@ class TransactionViewUpsertService(
                 TransactionStatusDto.ACTIVATED -> TransactionStatusDto.EXPIRED_NOT_AUTHORIZED
                 TransactionStatusDto.CANCELLATION_REQUESTED ->
                     TransactionStatusDto.CANCELLATION_EXPIRED
+
                 else -> TransactionStatusDto.EXPIRED
             }
         statusUpdate["status"] = targetViewStatus
