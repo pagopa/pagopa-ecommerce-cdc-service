@@ -37,6 +37,7 @@ public class CdcTracingUtils {
         CTX_EVENT_CODE("ctx.event.code", "{eventCode-not-found}", true),
         CTX_EVENT_ID("ctx.event.id", "{eventId-not-found}", true),
         EVENT_ACTION("event.action", "{eventAction-not-found}", true),
+        DEPENDENCY("dependency", "{dependency-not-found}", false),
         ERROR_TYPE("error.type", "{errorType-not-found}", false),
         ERROR_MESSAGE("error.message", "{errorMessage-not-found}", false);
 

@@ -77,7 +77,13 @@ class EcommerceCDCEventDispatcherService(
 
         return transactionViewUpsertService
             .upsertEventData(event)
-            .doOnSuccess { logger.info("Successfully upserted transaction view") }
+            .doOnSuccess {
+                CdcTracingUtils.withContextDetailsMdc(
+                    mapOf(CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-mongodb")
+                ) {
+                    logger.info("Successfully upserted transaction view")
+                }
+            }
             .doFinally { signalType ->
                 val outcome = if (signalType == SignalType.ON_ERROR) "ERROR" else "OK"
                 viewUpdateTracingUtils.addSpanForProcessedEvent(event, outcome)

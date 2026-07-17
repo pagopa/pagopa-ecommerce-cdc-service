@@ -186,6 +186,15 @@ class EcommerceTransactionsLogEventsStream(
                     cdcLockService
                         .acquireEventLock(event.id)
                         .filter { it == true }
+                        .doOnSuccess {
+                            CdcTracingUtils.withContextDetailsMdc(
+                                mapOf(
+                                    CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-redis"
+                                )
+                            ) {
+                                logger.info("Acquired lock")
+                            }
+                        }
                         .flatMap { ecommerceCDCEventDispatcherService.dispatchEvent(event) }
                 } ?: Mono.empty()
             }
@@ -216,6 +225,13 @@ class EcommerceTransactionsLogEventsStream(
                     .thenReturn(changeEventDocument)
             }
             .subscribeOn(Schedulers.boundedElastic())
+            .doOnSuccess {
+                CdcTracingUtils.withContextDetailsMdc(
+                    mapOf(CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-redis")
+                ) {
+                    logger.info("Saved resume policy")
+                }
+            }
             .onErrorResume { error ->
                 CdcTracingUtils.withErrorMdc(error) { logger.error("Error saving resume policy") }
                 Mono.empty()

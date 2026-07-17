@@ -109,14 +109,16 @@ class TransactionViewUpsertService(
                     }
             }
             .doOnNext { updateResult ->
-                CdcTracingUtils.withContextDetailsMdc(
-                    mapOf(
-                        "matched" to updateResult.matchedCount,
-                        "modified" to updateResult.modifiedCount,
-                        "upserted" to (updateResult.upsertedId != null),
-                    )
-                ) {
-                    logger.debug("Upsert completed")
+                if (logger.isDebugEnabled) {
+                    CdcTracingUtils.withContextDetailsMdc(
+                        mapOf(
+                            "matched" to updateResult.matchedCount,
+                            "modified" to updateResult.modifiedCount,
+                            "upserted" to (updateResult.upsertedId != null),
+                        )
+                    ) {
+                        logger.debug("Upsert completed")
+                    }
                 }
             }
     }
