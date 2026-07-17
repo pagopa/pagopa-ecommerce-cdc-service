@@ -66,7 +66,6 @@ class TransactionViewUpsertService(
                 tryToUpdateExistingView(event, statusUpdate, dataUpdate)
                     .flatMap { updateResult ->
                         if (updateResult.modifiedCount == 0L) {
-                            logger.warn("No document updated")
                             upsertTransaction(
                                     event,
                                     statusUpdate.set(
