@@ -20,7 +20,6 @@ public class CdcTracingUtils {
 
     private static final String CTX_DETAILS_KEY = "ctx.details";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final Logger LOGGER = LoggerFactory.getLogger(CdcTracingUtils.class);
 
     private CdcTracingUtils() {
     }
