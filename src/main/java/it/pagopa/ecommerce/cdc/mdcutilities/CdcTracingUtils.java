@@ -172,25 +172,21 @@ public class CdcTracingUtils {
                                                 Runnable block
     ) {
         List<String> detailKeys = new ArrayList<>();
-        if (entries != null) {
-            entries.forEach(
-                    (
-                     key,
-                     value
-                    ) -> {
-                        if (key != null && value != null) {
-                            try {
-                                MDC.put(key, value.toString());
-                                detailKeys.add(key);
-                            } catch (RuntimeException e) {
-                                LOGGER.warn("Cannot insert MDC entry for key [{}]", key, e);
-                            }
-                        }
-                    }
-            );
-        }
 
         try {
+            if (entries != null) {
+                entries.forEach(
+                        (
+                                key,
+                                value
+                        ) -> {
+                            if (key != null && value != null) {
+                                    MDC.put(key, value.toString());
+                                    detailKeys.add(key);
+                            }
+                        }
+                );
+            }
             block.run();
         } finally {
             detailKeys.forEach(MDC::remove);
