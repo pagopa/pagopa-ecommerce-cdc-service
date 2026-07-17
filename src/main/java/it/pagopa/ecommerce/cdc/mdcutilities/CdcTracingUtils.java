@@ -177,12 +177,12 @@ public class CdcTracingUtils {
             if (entries != null) {
                 entries.forEach(
                         (
-                                key,
-                                value
+                         key,
+                         value
                         ) -> {
                             if (key != null && value != null) {
-                                    MDC.put(key, value.toString());
-                                    detailKeys.add(key);
+                                MDC.put(key, value.toString());
+                                detailKeys.add(key);
                             }
                         }
                 );
