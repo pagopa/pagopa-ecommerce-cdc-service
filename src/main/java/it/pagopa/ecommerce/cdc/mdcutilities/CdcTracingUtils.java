@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -37,6 +38,7 @@ public class CdcTracingUtils {
         CTX_EVENT_CODE("ctx.event.code", "{eventCode-not-found}", true),
         CTX_EVENT_ID("ctx.event.id", "{eventId-not-found}", true),
         EVENT_ACTION("event.action", "{eventAction-not-found}", true),
+        EVENT_OUTCOME("event.outcome", "{eventOutcome-not-found}", false),
         DEPENDENCY("dependency", "{dependency-not-found}", false),
         ERROR_TYPE("error.type", "{errorType-not-found}", false),
         ERROR_MESSAGE("error.message", "{errorMessage-not-found}", false);
@@ -96,6 +98,57 @@ public class CdcTracingUtils {
     }
 
     /**
+     * Executes a block with error attributes ({@code error.type} and
+     * {@code error.message}) and an arbitrary map of top-level attributes
+     * temporarily stored in MDC.
+     *
+     * <p>
+     * Error attributes are extracted from the provided {@link Throwable}. Top-level
+     * attributes are passed to MDC cleanup logic where string conversion is
+     * handled. All keys are guaranteed to be removed after block execution.
+     *
+     * @param error      the exception to extract type and message from (can be
+     *                   null)
+     * @param attributes map of top-level MDC key-value attributes (can be null)
+     * @param block      code to execute while attributes are available in MDC
+     */
+    public static void withErrorMdc(
+                                    Throwable error,
+                                    Map<String, ?> attributes,
+                                    Runnable block
+    ) {
+        Map<String, Object> mdcMap = new HashMap<>();
+
+        mdcMap.put(
+                TracingEntry.ERROR_TYPE.getKey(),
+                error != null
+                        ? error.getClass().getName()
+                        : TracingEntry.ERROR_TYPE.getDefaultValue()
+        );
+        mdcMap.put(
+                TracingEntry.ERROR_MESSAGE.getKey(),
+                error != null && error.getMessage() != null
+                        ? error.getMessage()
+                        : TracingEntry.ERROR_MESSAGE.getDefaultValue()
+        );
+
+        if (attributes != null) {
+            attributes.forEach(
+                    (
+                     key,
+                     value
+                    ) -> {
+                        if (key != null && value != null) {
+                            mdcMap.put(key, value);
+                        }
+                    }
+            );
+        }
+
+        insertIntoMdcAndCleanup(mdcMap, block);
+    }
+
+    /**
      * Executes a block with structured error details temporarily inserted in MDC.
      *
      * <p>
@@ -109,19 +162,7 @@ public class CdcTracingUtils {
                                     Throwable error,
                                     Runnable block
     ) {
-        insertIntoMdcAndCleanup(
-                Map.of(
-                        TracingEntry.ERROR_TYPE.getKey(),
-                        error != null
-                                ? error.getClass().getName()
-                                : TracingEntry.ERROR_TYPE.getDefaultValue(),
-                        TracingEntry.ERROR_MESSAGE.getKey(),
-                        error != null && error.getMessage() != null
-                                ? error.getMessage()
-                                : TracingEntry.ERROR_MESSAGE.getDefaultValue()
-                ),
-                block
-        );
+        withErrorMdc(error, null, block);
     }
 
     /**
@@ -141,6 +182,29 @@ public class CdcTracingUtils {
                                              Map<String, ?> details,
                                              Runnable block
     ) {
+        withContextDetailsMdc(details, null, block);
+    }
+
+    /**
+     * Executes a block with {@code ctx.details} temporarily stored in MDC as a JSON
+     * string.
+     *
+     * <p>
+     * The input map is serialized to raw JSON and stored under key
+     * {@code ctx.details}. If serialization fails, an empty JSON object
+     * ({@code {}}) is used as fallback. The key is always removed after block
+     * execution.
+     *
+     * @param details map of detail values to serialize under {@code ctx.details}
+     * @param block   code to execute while {@code ctx.details} is available in MDC
+     */
+    public static void withContextDetailsMdc(
+                                             Map<String, ?> details,
+                                             Map<String, ?> attributes,
+                                             Runnable block
+    ) {
+        Map<String, Object> mdcMap = new HashMap<>();
+
         String rawDetails = "{}";
         if (details != null) {
             try {
@@ -149,11 +213,22 @@ public class CdcTracingUtils {
                 rawDetails = "{}";
             }
         }
+        mdcMap.put(CTX_DETAILS_KEY, rawDetails);
 
-        insertIntoMdcAndCleanup(
-                Map.of(CTX_DETAILS_KEY, rawDetails),
-                block
-        );
+        if (attributes != null) {
+            attributes.forEach(
+                    (
+                     k,
+                     v
+                    ) -> {
+                        if (k != null && v != null) {
+                            mdcMap.put(k, v);
+                        }
+                    }
+            );
+        }
+
+        insertIntoMdcAndCleanup(mdcMap, block);
     }
 
     /**

@@ -63,9 +63,6 @@ class RedisResumePolicyService(
      * @return a Mono<Boolean> with true value iff the save operation was successfully completed
      */
     override fun saveResumeTimestamp(timestamp: Instant): Mono<Boolean> {
-        CdcTracingUtils.withContextDetailsMdc(mapOf("timestamp" to timestamp.toString())) {
-            logger.debug("Saved instant")
-        }
         return redisTemplate.save(
             redisResumePolicyConfig.keyspace,
             redisResumePolicyConfig.target,

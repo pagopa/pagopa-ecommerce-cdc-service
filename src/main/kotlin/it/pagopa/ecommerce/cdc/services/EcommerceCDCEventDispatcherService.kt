@@ -79,7 +79,8 @@ class EcommerceCDCEventDispatcherService(
             .upsertEventData(event)
             .doOnSuccess {
                 CdcTracingUtils.withContextDetailsMdc(
-                    mapOf(CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-mongodb")
+                    mapOf(CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-mongodb"),
+                    mapOf(CdcTracingUtils.TracingEntry.EVENT_OUTCOME.key to "success"),
                 ) {
                     logger.info("Successfully upserted transaction view")
                 }

@@ -190,7 +190,8 @@ class EcommerceTransactionsLogEventsStream(
                             CdcTracingUtils.withContextDetailsMdc(
                                 mapOf(
                                     CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-redis"
-                                )
+                                ),
+                                mapOf(CdcTracingUtils.TracingEntry.EVENT_OUTCOME.key to "success"),
                             ) {
                                 logger.info("Acquired lock")
                             }
@@ -227,7 +228,8 @@ class EcommerceTransactionsLogEventsStream(
             .subscribeOn(Schedulers.boundedElastic())
             .doOnSuccess {
                 CdcTracingUtils.withContextDetailsMdc(
-                    mapOf(CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-redis")
+                    mapOf(CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-redis"),
+                    mapOf(CdcTracingUtils.TracingEntry.EVENT_OUTCOME.key to "success"),
                 ) {
                     logger.info("Saved resume policy")
                 }
