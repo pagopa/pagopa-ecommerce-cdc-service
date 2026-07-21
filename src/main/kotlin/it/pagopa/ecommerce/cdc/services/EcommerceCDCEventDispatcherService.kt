@@ -2,6 +2,7 @@ package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
 import it.pagopa.ecommerce.cdc.exceptions.CdcException
+import it.pagopa.ecommerce.cdc.mdcutilities.CdcTracingUtils
 import it.pagopa.ecommerce.cdc.utils.ViewUpdateTracingUtils
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import java.time.Duration
@@ -35,21 +36,7 @@ class EcommerceCDCEventDispatcherService(
      * @return Mono<TransactionEvent<*>> The processed transaction event
      */
     fun dispatchEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> =
-        Mono.defer {
-                // extract document fields
-                val transactionId = event.transactionId
-                val eventClass = event.javaClass
-                val creationDate = event.creationDate
-
-                logger.info(
-                    "Handling new change stream event: transactionId: [{}], eventType: [{}], creationDate: [{}]",
-                    transactionId,
-                    eventClass,
-                    creationDate,
-                )
-
-                processTransactionEvent(event)
-            }
+        Mono.defer { processTransactionEvent(event) }
             .retryWhen(
                 Retry.fixedDelay(
                         retrySendPolicyConfig.maxAttempts,
@@ -62,19 +49,20 @@ class EcommerceCDCEventDispatcherService(
                             true
                         }
                     }
-                    .doBeforeRetry { signal ->
-                        logger.warn(
-                            "Retrying event processing for event with id: [${event.id}], transaction id: [${event.transactionId}] for error during process, attempt: [${signal.totalRetries()}/${retrySendPolicyConfig.maxAttempts}]",
-                            signal.failure(),
-                        )
+                    .doAfterRetry { signal ->
+                        val retryAttempt = signal.totalRetries()
+                        val signalFailureMessage = signal.failure().message
+                        CdcTracingUtils.withContextDetailsMdc(
+                            mapOf(
+                                "retryAttempt" to retryAttempt,
+                                "maxRetryAttempts" to retrySendPolicyConfig.maxAttempts,
+                                "signalFailureMessage" to signalFailureMessage,
+                            )
+                        ) {
+                            logger.warn("Retried event processing after an error during process")
+                        }
                     }
             )
-            .doOnError { e ->
-                logger.error(
-                    "Error processing event with id: [${event.id}], transaction id: [${event.transactionId}]",
-                    e,
-                )
-            }
             .map { event }
 
     /**
@@ -86,35 +74,16 @@ class EcommerceCDCEventDispatcherService(
      * @return Mono<TransactionEvent<*>> The processed transaction event
      */
     private fun processTransactionEvent(event: TransactionEvent<*>): Mono<TransactionEvent<*>> {
-        val eventId = event.id
-        val transactionId = event.transactionId
-        val eventCode = event.eventCode
-        val creationDate = event.creationDate
-
-        logger.info(
-            "CDC Event Details: transactionId: [{}], eventId: [{}], eventCode: [{}], creationDate: [{}]",
-            transactionId,
-            eventId,
-            eventCode,
-            creationDate,
-        )
 
         return transactionViewUpsertService
             .upsertEventData(event)
             .doOnSuccess {
-                logger.debug(
-                    "Successfully upserted transaction view for eventId: [{}], transactionId: [{}]",
-                    eventId,
-                    transactionId,
-                )
-            }
-            .doOnError { error ->
-                logger.error(
-                    "Failed to upsert transaction view for eventId: [{}], transactionId: [{}]",
-                    eventId,
-                    transactionId,
-                    error,
-                )
+                CdcTracingUtils.withContextDetailsMdc(
+                    mapOf(CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-mongodb"),
+                    mapOf(CdcTracingUtils.TracingEntry.EVENT_OUTCOME.key to "success"),
+                ) {
+                    logger.info("Successfully upserted transaction view")
+                }
             }
             .doFinally { signalType ->
                 val outcome = if (signalType == SignalType.ON_ERROR) "ERROR" else "OK"

@@ -3,6 +3,7 @@ package it.pagopa.ecommerce.cdc.services
 import com.mongodb.client.result.UpdateResult
 import it.pagopa.ecommerce.cdc.exceptions.CdcEventTypeException
 import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
+import it.pagopa.ecommerce.cdc.mdcutilities.CdcTracingUtils
 import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import it.pagopa.ecommerce.commons.documents.v2.*
 import it.pagopa.ecommerce.commons.documents.v2.authorization.NpgTransactionGatewayAuthorizationData
@@ -57,25 +58,14 @@ class TransactionViewUpsertService(
      * @return Mono<UpdateResult> The result of the update/upsert operation
      */
     fun upsertEventData(event: TransactionEvent<*>): Mono<UpdateResult> {
-        val eventCode = event.eventCode
-        val transactionId = event.transactionId
 
-        logger.debug(
-            "Upserting transaction view data for _id: [{}], eventCode: [{}]",
-            transactionId,
-            eventCode,
-        )
+        logger.debug("Upserting transaction view data")
 
         return buildUpdateFromEvent(event)
             .flatMap { (dataUpdate, statusUpdate) ->
                 tryToUpdateExistingView(event, statusUpdate, dataUpdate)
                     .flatMap { updateResult ->
                         if (updateResult.modifiedCount == 0L) {
-                            logger.warn(
-                                "No document updated for transactionId: [{}] processing event with id: [{}], trying upsert",
-                                event.transactionId,
-                                event.id,
-                            )
                             upsertTransaction(
                                     event,
                                     statusUpdate.set(
@@ -119,14 +109,17 @@ class TransactionViewUpsertService(
                     }
             }
             .doOnNext { updateResult ->
-                logger.debug(
-                    "Upsert completed for transactionId: [{}], eventCode: [{}] - matched: {}, modified: {}, upserted: {}",
-                    transactionId,
-                    eventCode,
-                    updateResult.matchedCount,
-                    updateResult.modifiedCount,
-                    updateResult.upsertedId != null,
-                )
+                if (logger.isDebugEnabled) {
+                    CdcTracingUtils.withContextDetailsMdc(
+                        mapOf(
+                            "matched" to updateResult.matchedCount,
+                            "modified" to updateResult.modifiedCount,
+                            "upserted" to (updateResult.upsertedId != null),
+                        )
+                    ) {
+                        logger.debug("Upsert completed")
+                    }
+                }
             }
     }
 
@@ -297,11 +290,6 @@ class TransactionViewUpsertService(
                 is TransactionUserReceiptAddRetriedEvent -> updateUserReceiptRetryData(event)
 
                 else -> {
-                    logger.warn(
-                        "Unhandled event with code: [{}]. Event class: [{}]",
-                        eventCode,
-                        event.javaClass,
-                    )
                     return Mono.error {
                         CdcEventTypeException(
                             "Cannot handle event with eventCode: $eventCode Event class: ${event.javaClass}"
@@ -428,10 +416,11 @@ class TransactionViewUpsertService(
             }
 
             else ->
-                logger.warn(
-                    "Unhandled transaction gateway authorization data: [{}]",
-                    gatewayAuthData::class.java,
-                )
+                CdcTracingUtils.withContextDetailsMdc(
+                    mapOf("gatewayAuthorizationDataClass" to gatewayAuthData::class.java.toString())
+                ) {
+                    logger.warn("Unhandled transaction gateway authorization data")
+                }
         }
 
         statusUpdate["status"] = TransactionStatusDto.AUTHORIZATION_COMPLETED

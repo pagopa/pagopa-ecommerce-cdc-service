@@ -38,7 +38,6 @@ class CdcLockService(
      *   errors
      */
     fun acquireEventLock(eventId: String): Mono<Boolean> {
-        logger.debug("Trying to acquire lock for event: {}", eventId)
         return reactiveExclusiveLockDocumentWrapper
             .saveIfAbsent(
                 ExclusiveLockDocument(

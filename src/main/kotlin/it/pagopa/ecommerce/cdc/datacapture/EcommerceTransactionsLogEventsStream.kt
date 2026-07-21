@@ -4,6 +4,7 @@ import com.mongodb.MongoException
 import it.pagopa.ecommerce.cdc.config.properties.ChangeStreamOptionsConfig
 import it.pagopa.ecommerce.cdc.config.properties.RetryStreamPolicyConfig
 import it.pagopa.ecommerce.cdc.liveness.CustomLivenessIndicator
+import it.pagopa.ecommerce.cdc.mdcutilities.CdcTracingUtils
 import it.pagopa.ecommerce.cdc.services.CdcLockService
 import it.pagopa.ecommerce.cdc.services.EcommerceCDCEventDispatcherService
 import it.pagopa.ecommerce.cdc.services.RedisResumePolicyService
@@ -42,16 +43,12 @@ class EcommerceTransactionsLogEventsStream(
 
     override fun onApplicationEvent(event: ApplicationReadyEvent) {
 
-        logger.info(
-            "Starting transaction change stream consumer for collection: ${changeStreamOptionsConfig.collection}"
-        )
         streamEcommerceTransactionsLogEvents()
-            .doOnSubscribe {
-                logger.info("CDC service is now running and waiting for change stream events...")
-                CustomLivenessIndicator.cdcStreamUpAndRunning.set(true)
-            }
+            .doOnSubscribe { CustomLivenessIndicator.cdcStreamUpAndRunning.set(true) }
             .doOnError { error ->
-                logger.error("A critical error occurred in the change stream pipeline", error)
+                CdcTracingUtils.withErrorMdc(error) {
+                    logger.error("A critical error occurred in the change stream pipeline")
+                }
                 CustomLivenessIndicator.cdcStreamUpAndRunning.set(false)
             }
             .doOnComplete {
@@ -71,9 +68,6 @@ class EcommerceTransactionsLogEventsStream(
     fun streamEcommerceTransactionsLogEvents(): Flux<TransactionEvent<*>> {
         val flux: Flux<TransactionEvent<*>> =
             Flux.defer {
-                    logger.info(
-                        "Connecting to MongoDB Change Stream for collection: ${changeStreamOptionsConfig.collection}"
-                    )
                     redisResumePolicyService
                         .getResumeTimestamp()
                         .flatMapMany { resumeTimestamp ->
@@ -117,28 +111,35 @@ class EcommerceTransactionsLogEventsStream(
                                     val fullDocument = it.raw?.fullDocument
                                     val skipDocument = fullDocument?.containsKey("ttl") ?: false
                                     if (skipDocument) {
-                                        logger.info(
-                                            "Skip event with id: {}",
-                                            fullDocument.get("_id"),
-                                        )
+                                        CdcTracingUtils.withContextDetailsMdc(
+                                            mapOf("skippedEventId" to fullDocument.get("_id"))
+                                        ) {
+                                            logger.info("Skipped event")
+                                        }
                                     }
                                     return@filter !skipDocument
                                 }
                                 .flatMap {
                                     mono { it.body }
-                                        .onErrorResume { exception ->
-                                            logger.warn(
-                                                "Exception converting document to POJO, skipping document: [${
-                                                it.raw?.fullDocument.toString()
-                                            }]",
-                                                exception,
-                                            )
+                                        .onErrorResume { _ ->
+                                            CdcTracingUtils.withContextDetailsMdc(
+                                                mapOf(
+                                                    "rawFullDocument" to
+                                                        it.raw?.fullDocument.toString()
+                                                )
+                                            ) {
+                                                logger.warn("Exception converting document to POJO")
+                                            }
                                             Mono.empty()
                                         }
                                 }
                         }
                         // Process the elements of the Flux
-                        .flatMap { processEvent(it) }
+                        .flatMap { currentEvent ->
+                            processEvent(currentEvent).contextWrite { context ->
+                                CdcTracingUtils.enrichContextForCdcEvent(currentEvent, context)
+                            }
+                        }
                         // Save resume token every n emitted elements
                         .index { changeEventFluxIndex, changeEventDocument ->
                             Pair(changeEventFluxIndex, changeEventDocument)
@@ -146,7 +147,11 @@ class EcommerceTransactionsLogEventsStream(
                         .flatMap { (changeEventFluxIndex, changeEventDocument) ->
                             saveCdcResumeToken(changeEventFluxIndex, changeEventDocument)
                         }
-                        .doOnError { logger.error("Error listening to change stream: ", it) }
+                        .doOnError { error ->
+                            CdcTracingUtils.withErrorMdc(error) {
+                                logger.error("Error listening to change stream")
+                            }
+                        }
                 }
                 .retryWhen(
                     Retry.fixedDelay(
@@ -154,12 +159,18 @@ class EcommerceTransactionsLogEventsStream(
                             Duration.ofMillis(retryStreamPolicyConfig.intervalInMs),
                         )
                         .filter { t -> t is MongoException }
-                        .doBeforeRetry { signal ->
-                            logger.warn("Retrying connection to DB: ${signal.failure().message}")
+                        .doAfterRetry { signal ->
+                            CdcTracingUtils.withContextDetailsMdc(
+                                mapOf("retryFailureMessage" to signal.failure().message)
+                            ) {
+                                logger.warn("Connection restored to DB")
+                            }
                         }
                 )
-                .doOnError { e ->
-                    logger.error("Failed to connect to DB after retries {}", e.message)
+                .doOnError { error ->
+                    CdcTracingUtils.withErrorMdc(error) {
+                        logger.error("Failed to connect to DB after retries")
+                    }
                 }
 
         return flux
@@ -175,11 +186,21 @@ class EcommerceTransactionsLogEventsStream(
                     cdcLockService
                         .acquireEventLock(event.id)
                         .filter { it == true }
+                        .doOnNext {
+                            CdcTracingUtils.withContextDetailsMdc(
+                                mapOf(
+                                    CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-redis"
+                                ),
+                                mapOf(CdcTracingUtils.TracingEntry.EVENT_OUTCOME.key to "success"),
+                            ) {
+                                logger.info("Acquired lock")
+                            }
+                        }
                         .flatMap { ecommerceCDCEventDispatcherService.dispatchEvent(event) }
                 } ?: Mono.empty()
             }
-            .onErrorResume {
-                logger.error("Error during event handling: ", it)
+            .onErrorResume { error ->
+                CdcTracingUtils.withErrorMdc(error) { logger.error("Error during event handling") }
                 Mono.empty()
             }
     }
@@ -205,8 +226,16 @@ class EcommerceTransactionsLogEventsStream(
                     .thenReturn(changeEventDocument)
             }
             .subscribeOn(Schedulers.boundedElastic())
-            .onErrorResume {
-                logger.error("Error saving resume policy: ", it)
+            .doOnSuccess {
+                CdcTracingUtils.withContextDetailsMdc(
+                    mapOf(CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-redis"),
+                    mapOf(CdcTracingUtils.TracingEntry.EVENT_OUTCOME.key to "success"),
+                ) {
+                    logger.info("Saved resume policy")
+                }
+            }
+            .onErrorResume { error ->
+                CdcTracingUtils.withErrorMdc(error) { logger.error("Error saving resume policy") }
                 Mono.empty()
             }
 }
