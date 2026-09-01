@@ -1,8 +1,11 @@
 name: Trigger pipeline deploy
 
 on:
-  release:
-    types: [published]
+  pull_request:
+    branches:
+      - main
+    types: [ opened, synchronize, labeled, unlabeled, reopened, edited ]
+
 
 permissions:
   contents: read
