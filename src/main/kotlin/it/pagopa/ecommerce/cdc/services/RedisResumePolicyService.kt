@@ -1,7 +1,7 @@
 package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RedisResumePolicyConfig
-import it.pagopa.ecommerce.cdc.mdcutilities.CdcTracingUtils
+import it.pagopa.ecommerce.commons.mdcutilities.LogTracingUtils
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -41,11 +41,16 @@ class RedisResumePolicyService(
                 redisResumePolicyConfig.target,
             )
             .switchIfEmpty {
-                CdcTracingUtils.withContextDetailsMdc(
-                    mapOf("fallbackInMin" to redisResumePolicyConfig.fallbackInMin)
-                ) {
-                    logger.warn("Resume timestamp not found on Redis, using configured fallback")
-                }
+                LogTracingUtils.loggerTracingUtils()
+                    .failure()
+                    .dependency(LogTracingUtils.REDIS_DEPENDENCY)
+                    .details(
+                        mapOf("fallback_in_min" to redisResumePolicyConfig.fallbackInMin.toString())
+                    )
+                    .logWarn(
+                        logger,
+                        "Resume timestamp not found on Redis, using configured fallback",
+                    )
                 Mono.just(
                     Instant.now().minus(redisResumePolicyConfig.fallbackInMin, ChronoUnit.MINUTES)
                 )
