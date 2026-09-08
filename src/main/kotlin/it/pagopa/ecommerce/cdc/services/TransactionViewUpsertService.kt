@@ -3,12 +3,12 @@ package it.pagopa.ecommerce.cdc.services
 import com.mongodb.client.result.UpdateResult
 import it.pagopa.ecommerce.cdc.exceptions.CdcEventTypeException
 import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
-import it.pagopa.ecommerce.cdc.mdcutilities.CdcTracingUtils
 import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import it.pagopa.ecommerce.commons.documents.v2.*
 import it.pagopa.ecommerce.commons.documents.v2.authorization.NpgTransactionGatewayAuthorizationData
 import it.pagopa.ecommerce.commons.documents.v2.authorization.RedirectTransactionGatewayAuthorizationData
 import it.pagopa.ecommerce.commons.generated.server.model.TransactionStatusDto
+import it.pagopa.ecommerce.commons.mdcutilities.LogTracingUtils
 import java.time.ZonedDateTime
 import kotlinx.coroutines.reactor.mono
 import org.slf4j.LoggerFactory
@@ -59,8 +59,6 @@ class TransactionViewUpsertService(
      */
     fun upsertEventData(event: TransactionEvent<*>): Mono<UpdateResult> {
 
-        logger.debug("Upserting transaction view data")
-
         return buildUpdateFromEvent(event)
             .flatMap { (dataUpdate, statusUpdate) ->
                 tryToUpdateExistingView(event, statusUpdate, dataUpdate)
@@ -110,15 +108,16 @@ class TransactionViewUpsertService(
             }
             .doOnNext { updateResult ->
                 if (logger.isDebugEnabled) {
-                    CdcTracingUtils.withContextDetailsMdc(
-                        mapOf(
-                            "matched" to updateResult.matchedCount,
-                            "modified" to updateResult.modifiedCount,
-                            "upserted" to (updateResult.upsertedId != null),
+                    LogTracingUtils.loggerTracingUtils()
+                        .success()
+                        .details(
+                            mapOf(
+                                "matched" to updateResult.matchedCount.toString(),
+                                "modified" to updateResult.modifiedCount.toString(),
+                                "upserted" to (updateResult.upsertedId != null).toString(),
+                            )
                         )
-                    ) {
-                        logger.debug("Upsert completed")
-                    }
+                        .logDebug(logger, "Upsert completed")
                 }
             }
     }
@@ -416,11 +415,15 @@ class TransactionViewUpsertService(
             }
 
             else ->
-                CdcTracingUtils.withContextDetailsMdc(
-                    mapOf("gatewayAuthorizationDataClass" to gatewayAuthData::class.java.toString())
-                ) {
-                    logger.warn("Unhandled transaction gateway authorization data")
-                }
+                LogTracingUtils.loggerTracingUtils()
+                    .failure()
+                    .details(
+                        mapOf(
+                            "gateway_authorization_data_class" to
+                                gatewayAuthData::class.java.toString()
+                        )
+                    )
+                    .logWarn(logger, "Unhandled transaction gateway authorization data")
         }
 
         statusUpdate["status"] = TransactionStatusDto.AUTHORIZATION_COMPLETED

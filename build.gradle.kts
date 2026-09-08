@@ -45,7 +45,7 @@ object Dependencies {
 }
 
 // eCommerce commons library version
-val ecommerceCommonsVersion = "3.10.0"
+val ecommerceCommonsVersion = "3.11.1"
 
 // eCommerce commons library git ref (by default tag)
 val ecommerceCommonsGitRef = ecommerceCommonsVersion
@@ -62,6 +62,7 @@ dependencies {
   implementation("io.opentelemetry:opentelemetry-api:${Dependencies.OPEN_TELEMETRY_VERSION}")
   // eCommerce commons library
   implementation("it.pagopa:pagopa-ecommerce-commons:$ecommerceCommonsVersion")
+  implementation("io.micrometer:context-propagation")
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
   testImplementation("org.springframework.boot:spring-boot-starter-test")

@@ -1,6 +1,6 @@
 package it.pagopa.ecommerce.cdc.liveness
 
-import it.pagopa.ecommerce.cdc.mdcutilities.CdcTracingUtils
+import it.pagopa.ecommerce.commons.mdcutilities.LogTracingUtils
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
@@ -50,14 +50,15 @@ class CustomLivenessIndicator(
             inactivityTimeout.isPositive &&
                 Duration.between(lastDequeuedEventAt, Instant.now()).abs() > inactivityTimeout
         ) {
-            CdcTracingUtils.withContextDetailsMdc(
-                mapOf(
-                    "lastDequeuedEventAt" to lastDequeuedEventAt,
-                    "inactivityTimeout" to inactivityTimeout,
+            LogTracingUtils.loggerTracingUtils()
+                .failure()
+                .details(
+                    mapOf(
+                        "last_dequeued_event_at" to lastDequeuedEventAt.toString(),
+                        "inactivity_timeout" to inactivityTimeout.toString(),
+                    )
                 )
-            ) {
-                logger.error("CDC inactivity detected.")
-            }
+                .logWarn(logger, "CDC inactivity detected.")
             return LivenessState.BROKEN
         }
         return LivenessState.CORRECT

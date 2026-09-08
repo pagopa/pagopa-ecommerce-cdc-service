@@ -2,9 +2,9 @@ package it.pagopa.ecommerce.cdc.services
 
 import it.pagopa.ecommerce.cdc.config.properties.RetrySendPolicyConfig
 import it.pagopa.ecommerce.cdc.exceptions.CdcException
-import it.pagopa.ecommerce.cdc.mdcutilities.CdcTracingUtils
 import it.pagopa.ecommerce.cdc.utils.ViewUpdateTracingUtils
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
+import it.pagopa.ecommerce.commons.mdcutilities.LogTracingUtils
 import java.time.Duration
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -52,15 +52,20 @@ class EcommerceCDCEventDispatcherService(
                     .doAfterRetry { signal ->
                         val retryAttempt = signal.totalRetries()
                         val signalFailureMessage = signal.failure().message
-                        CdcTracingUtils.withContextDetailsMdc(
-                            mapOf(
-                                "retryAttempt" to retryAttempt,
-                                "maxRetryAttempts" to retrySendPolicyConfig.maxAttempts,
-                                "signalFailureMessage" to signalFailureMessage,
+                        LogTracingUtils.loggerTracingUtils()
+                            .failure()
+                            .details(
+                                mapOf(
+                                    "retry_attempt" to retryAttempt.toString(),
+                                    "max_retry_attempts" to
+                                        retrySendPolicyConfig.maxAttempts.toString(),
+                                    "signal_failure_message" to signalFailureMessage,
+                                )
                             )
-                        ) {
-                            logger.warn("Retried event processing after an error during process")
-                        }
+                            .logWarn(
+                                logger,
+                                "Retried event processing after an error during process",
+                            )
                     }
             )
             .map { event }
@@ -78,12 +83,10 @@ class EcommerceCDCEventDispatcherService(
         return transactionViewUpsertService
             .upsertEventData(event)
             .doOnSuccess {
-                CdcTracingUtils.withContextDetailsMdc(
-                    mapOf(CdcTracingUtils.TracingEntry.DEPENDENCY.key to "eCommerce-mongodb"),
-                    mapOf(CdcTracingUtils.TracingEntry.EVENT_OUTCOME.key to "success"),
-                ) {
-                    logger.info("Successfully upserted transaction view")
-                }
+                LogTracingUtils.loggerTracingUtils()
+                    .success()
+                    .dependency(LogTracingUtils.MONGO_DEPENDENCY)
+                    .logInfo(logger, "Successfully upserted transaction view")
             }
             .doFinally { signalType ->
                 val outcome = if (signalType == SignalType.ON_ERROR) "ERROR" else "OK"

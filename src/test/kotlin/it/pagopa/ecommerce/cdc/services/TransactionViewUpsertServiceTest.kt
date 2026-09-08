@@ -107,6 +107,16 @@ class TransactionViewUpsertServiceTest {
                         )
                     )
                 ),
+                Arguments.of(
+                    TransactionTestUtils.transactionAuthorizationCompletedEvent(
+                        TransactionTestUtils.pgsTransactionGatewayAuthorizationData(
+                            TransactionTestUtils.AUTHORIZATION_RESULT_DTO,
+                            "redirect failed",
+                        )
+                    ),
+                    RedirectTransactionGatewayAuthorizationData.Outcome.KO.toString(),
+                    "redirect failed",
+                ),
             )
 
         @JvmStatic
