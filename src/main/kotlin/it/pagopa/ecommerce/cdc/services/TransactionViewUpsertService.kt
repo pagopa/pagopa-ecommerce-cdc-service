@@ -59,8 +59,6 @@ class TransactionViewUpsertService(
      */
     fun upsertEventData(event: TransactionEvent<*>): Mono<UpdateResult> {
 
-        logger.debug("Upserting transaction view data")
-
         return buildUpdateFromEvent(event)
             .flatMap { (dataUpdate, statusUpdate) ->
                 tryToUpdateExistingView(event, statusUpdate, dataUpdate)
