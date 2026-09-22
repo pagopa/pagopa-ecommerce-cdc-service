@@ -204,7 +204,7 @@ stages:
               RUN_TEST_FOR: PAYMENT
 
   - stage: TAS_tests_DEV
-    dependsOn: Deploy_for_DEV
+    dependsOn: test_fake_buil_and_deploy
     pool:
       vmImage: 'ubuntu-latest'
     jobs:
