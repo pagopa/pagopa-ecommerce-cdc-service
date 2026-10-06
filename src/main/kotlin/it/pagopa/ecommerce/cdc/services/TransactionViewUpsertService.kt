@@ -3,6 +3,7 @@ package it.pagopa.ecommerce.cdc.services
 import com.mongodb.client.result.UpdateResult
 import it.pagopa.ecommerce.cdc.exceptions.CdcEventTypeException
 import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
+import it.pagopa.ecommerce.cdc.utils.ViewUpdateTracingUtils
 import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import it.pagopa.ecommerce.commons.documents.v2.*
 import it.pagopa.ecommerce.commons.documents.v2.authorization.NpgTransactionGatewayAuthorizationData
@@ -19,6 +20,7 @@ import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Update
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
+import reactor.core.publisher.SignalType
 import reactor.kotlin.core.publisher.switchIfEmpty
 
 /**
@@ -37,7 +39,9 @@ import reactor.kotlin.core.publisher.switchIfEmpty
 @Service
 class TransactionViewUpsertService(
     private val mongoTemplate: ReactiveMongoTemplate,
-    @Value($$"${ecommerce.transactionView.collection.name}") private val transactionViewName: String,
+    @Value($$"${ecommerce.transactionView.collection.name}")
+    private val transactionViewName: String,
+    private val viewUpdateTracingUtils: ViewUpdateTracingUtils,
 ) {
 
     private val logger = LoggerFactory.getLogger(TransactionViewUpsertService::class.java)
@@ -104,6 +108,11 @@ class TransactionViewUpsertService(
                                 message = "Query didn't match any condition to update the view"
                             )
                         }
+                    }
+                    .doFinally { signalType ->
+                        val outcome = if (signalType == SignalType.ON_ERROR) "ERROR" else "OK"
+                        val viewStatus = statusUpdate.updateObject["status"]?.toString()
+                        viewUpdateTracingUtils.addSpanForProcessedEvent(event, outcome, viewStatus)
                     }
             }
             .doOnNext { updateResult ->

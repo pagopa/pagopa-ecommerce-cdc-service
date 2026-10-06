@@ -2,13 +2,15 @@ import io.opentelemetry.api.common.Attributes
 import it.pagopa.ecommerce.cdc.utils.ViewUpdateTracingUtils
 import it.pagopa.ecommerce.commons.documents.v2.TransactionActivatedEvent
 import it.pagopa.ecommerce.commons.utils.OpenTelemetryUtils
+import it.pagopa.ecommerce.commons.v2.TransactionTestUtils
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.NullSource
+import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
 
 class ViewUpdateTracingUtilsTest {
 
@@ -16,21 +18,22 @@ class ViewUpdateTracingUtilsTest {
 
     private val viewUpdateTracingUtils = ViewUpdateTracingUtils(openTelemetryUtils)
 
-    @Test
-    fun `should add span with correct attributes for processed event`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["ACTIVATED"])
+    @NullSource
+    fun `should add span with correct attributes for processed event handling optional attributes`(
+        exceptedViewStatus: String?
+    ) {
         // --- ARRANGE ---
-        val expectedCode = "TRANSACTION_ACTIVATED"
-        val expectedTxId = "tx-12345"
-        val expectedDate = "2023-10-05T12:00:00Z"
+
+        val event: TransactionActivatedEvent = TransactionTestUtils.transactionActivateEvent()
+        val expectedCode = event.eventCode
+        val expectedTxId = event.transactionId
+        val expectedDate = event.creationDate
         val expectedOutcome = "OK"
 
-        val event: TransactionActivatedEvent = mock()
-        whenever(event.eventCode).thenReturn(expectedCode)
-        whenever(event.transactionId).thenReturn(expectedTxId)
-        whenever(event.creationDate).thenReturn(expectedDate)
-
         // --- ACT ---
-        viewUpdateTracingUtils.addSpanForProcessedEvent(event, expectedOutcome)
+        viewUpdateTracingUtils.addSpanForProcessedEvent(event, expectedOutcome, exceptedViewStatus)
 
         // --- ASSERT ---
         argumentCaptor<Attributes> {
@@ -69,6 +72,14 @@ class ViewUpdateTracingUtilsTest {
                 expectedOutcome,
                 capturedAttributes.get(
                     ViewUpdateTracingUtils.CDC_EVENT_STORE_PROCESSED_EVENT_OUTCOME_ATTRIBUTE_KEY
+                ),
+                "Outcome attribute mismatch",
+            )
+            assertEquals(
+                exceptedViewStatus,
+                capturedAttributes.get(
+                    ViewUpdateTracingUtils
+                        .CDC_EVENT_STORE_PROCESSED_EVENT_VIEW_STATUS_UPDATE_ATTRIBUTE_KEY
                 ),
                 "Outcome attribute mismatch",
             )

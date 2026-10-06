@@ -2,6 +2,7 @@ package it.pagopa.ecommerce.cdc.services
 
 import com.mongodb.client.result.UpdateResult
 import it.pagopa.ecommerce.cdc.exceptions.CdcQueryMatchException
+import it.pagopa.ecommerce.cdc.utils.ViewUpdateTracingUtils
 import it.pagopa.ecommerce.commons.documents.BaseTransactionView
 import it.pagopa.ecommerce.commons.documents.v2.*
 import it.pagopa.ecommerce.commons.documents.v2.authorization.NpgTransactionGatewayAuthorizationData
@@ -36,11 +37,13 @@ class TransactionViewUpsertServiceTest {
 
     private val mongoTemplate: ReactiveMongoTemplate = mock()
     private val collectionName = "collectionName"
+    private val viewUpdateTracingUtils: ViewUpdateTracingUtils = mock()
 
     private val transactionViewUpsertService =
         TransactionViewUpsertService(
             mongoTemplate = mongoTemplate,
             transactionViewName = collectionName,
+            viewUpdateTracingUtils = viewUpdateTracingUtils,
         )
 
     companion object {
