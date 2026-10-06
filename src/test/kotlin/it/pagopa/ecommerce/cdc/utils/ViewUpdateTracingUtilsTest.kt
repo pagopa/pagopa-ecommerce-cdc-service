@@ -1,8 +1,10 @@
+package it.pagopa.ecommerce.cdc.utils
+
 import io.opentelemetry.api.common.Attributes
-import it.pagopa.ecommerce.cdc.utils.ViewUpdateTracingUtils
 import it.pagopa.ecommerce.commons.documents.v2.TransactionActivatedEvent
 import it.pagopa.ecommerce.commons.utils.OpenTelemetryUtils
 import it.pagopa.ecommerce.commons.v2.TransactionTestUtils
+import org.bson.Document
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.NullSource
@@ -31,9 +33,17 @@ class ViewUpdateTracingUtilsTest {
         val expectedTxId = event.transactionId
         val expectedDate = event.creationDate
         val expectedOutcome = "OK"
+        val updateStatusDocument = Document()
+        val setDocument = Document()
+        setDocument["status"] = exceptedViewStatus
+        updateStatusDocument[$$"$set"] = setDocument
 
         // --- ACT ---
-        viewUpdateTracingUtils.addSpanForProcessedEvent(event, expectedOutcome, exceptedViewStatus)
+        viewUpdateTracingUtils.addSpanForProcessedEvent(
+            event,
+            expectedOutcome,
+            updateStatusDocument,
+        )
 
         // --- ASSERT ---
         argumentCaptor<Attributes> {

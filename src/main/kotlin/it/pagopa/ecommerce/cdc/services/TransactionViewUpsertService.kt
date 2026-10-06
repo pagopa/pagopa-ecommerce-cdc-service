@@ -111,8 +111,11 @@ class TransactionViewUpsertService(
                     }
                     .doFinally { signalType ->
                         val outcome = if (signalType == SignalType.ON_ERROR) "ERROR" else "OK"
-                        val viewStatus = statusUpdate.updateObject["status"]?.toString()
-                        viewUpdateTracingUtils.addSpanForProcessedEvent(event, outcome, viewStatus)
+                        viewUpdateTracingUtils.addSpanForProcessedEvent(
+                            event,
+                            outcome,
+                            statusUpdate.updateObject,
+                        )
                     }
             }
             .doOnNext { updateResult ->

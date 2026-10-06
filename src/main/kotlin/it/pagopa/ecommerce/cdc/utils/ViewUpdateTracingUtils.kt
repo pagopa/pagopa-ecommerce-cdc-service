@@ -4,6 +4,7 @@ import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.common.Attributes
 import it.pagopa.ecommerce.commons.documents.v2.TransactionEvent
 import it.pagopa.ecommerce.commons.utils.OpenTelemetryUtils
+import org.bson.Document
 import org.springframework.stereotype.Component
 
 @Component
@@ -22,9 +23,13 @@ class ViewUpdateTracingUtils(val openTelemetryUtils: OpenTelemetryUtils) {
             AttributeKey.stringKey("ecommerce.cdc.processedEvent.viewStatusUpdate")
     }
 
-    fun addSpanForProcessedEvent(event: TransactionEvent<*>, outcome: String, viewStatus: String?) {
+    fun addSpanForProcessedEvent(
+        event: TransactionEvent<*>,
+        outcome: String,
+        updateStatusDocument: Document,
+    ) {
         val spanAttributes =
-            viewStatus.let { status ->
+            updateStatusDocument.let { updateDocument ->
                 var attributes =
                     Attributes.of(
                         CDC_EVENT_STORE_PROCESSED_EVENT_CODE_ATTRIBUTE_KEY,
@@ -36,15 +41,20 @@ class ViewUpdateTracingUtils(val openTelemetryUtils: OpenTelemetryUtils) {
                         CDC_EVENT_STORE_PROCESSED_EVENT_OUTCOME_ATTRIBUTE_KEY,
                         outcome,
                     )
-                if (status != null) {
-                    attributes =
-                        attributes
-                            .toBuilder()
-                            .put(
-                                CDC_EVENT_STORE_PROCESSED_EVENT_VIEW_STATUS_UPDATE_ATTRIBUTE_KEY,
-                                viewStatus,
-                            )
-                            .build()
+                // add custom attributes taken from update query
+                if (updateDocument[$$"$set"] is Document) {
+                    val setDocument = updateDocument[$$"$set"] as Document
+                    val viewStatus = setDocument["status"]?.toString()
+                    if (viewStatus != null) {
+                        attributes =
+                            attributes
+                                .toBuilder()
+                                .put(
+                                    CDC_EVENT_STORE_PROCESSED_EVENT_VIEW_STATUS_UPDATE_ATTRIBUTE_KEY,
+                                    viewStatus,
+                                )
+                                .build()
+                    }
                 }
                 attributes
             }
